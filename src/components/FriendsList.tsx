@@ -82,14 +82,12 @@ export const FriendsList: React.FC<{ currentRoomId?: string, currentRoomName?: s
     if (!searchQuery.trim() || !user) return;
     setLoading(true);
     try {
-      const q = query(collection(db, 'users'), 
-        where('displayName', '>=', searchQuery), 
-        where('displayName', '<=', searchQuery + '\uf8ff')
-      );
-      const snap = await getDocs(q);
+      const snap = await getDocs(collection(db, 'users'));
+      const lowerQuery = searchQuery.toLowerCase();
       const results = snap.docs
         .map(d => d.data() as UserProfile)
-        .filter(p => p.uid !== user.uid);
+        .filter(p => p.uid !== user.uid && p.displayName && p.displayName.toLowerCase().includes(lowerQuery))
+        .slice(0, 10);
       setSearchResults(results);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'users');
@@ -191,16 +189,25 @@ export const FriendsList: React.FC<{ currentRoomId?: string, currentRoomName?: s
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Buscar jogadores..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-white text-sm focus:outline-none focus:border-amber-500 transition-colors"
-        />
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+      <div className="relative flex gap-2">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Buscar jogadores..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-white text-sm focus:outline-none focus:border-amber-500 transition-colors"
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+        </div>
+        <button 
+          onClick={handleSearch}
+          disabled={loading}
+          className="bg-amber-500 hover:bg-amber-400 text-stone-900 px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+        >
+          {loading ? '...' : 'Buscar'}
+        </button>
       </div>
 
       {/* Search Results */}
