@@ -1,0 +1,44 @@
+type User @table {
+  username: String!
+  email: String!
+  passwordHash: String!
+  avatarUrl: String
+  createdAt: Timestamp!
+  lastLogin: Timestamp
+}
+
+type GameRoom @table {
+  name: String!
+  status: String!
+  maxPlayers: Int!
+  password: String
+  gameVariant: String
+  createdAt: Timestamp!
+  creator: User
+}
+
+type PlayerInGame @table(key: ["user", "gameRoom"]) {
+  user: User!
+  gameRoom: GameRoom!
+  joinOrder: Int!
+  currentScore: Int!
+  isWinner: Boolean!
+  createdAt: Timestamp!
+  cardsInHand: String # Placeholder for serialization of cards in hand
+}
+
+type GameEvent @table {
+  gameRoom: GameRoom
+  user: User
+  eventType: String!
+  cardPlayed: String # Details of the card, e.g., "AceOfSpades"
+  targetPlayer: User
+  timestamp: Timestamp!
+}
+
+type Friendship @table(key: ["initiator", "recipient"]) {
+  initiator: User!
+  recipient: User!
+  status: String!
+  createdAt: Timestamp!
+}

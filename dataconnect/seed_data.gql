@@ -1,0 +1,53 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "This is a seed data mutation and only available to authenticated users.") {
+  user_insertMany(data: [
+    {
+      id: "d9e7a4b8-2e1c-4f5d-9c3a-1b2f8e7d6a5c",
+      username: "playerOne",
+      email: "playerone@example.com",
+      passwordHash: "hashedpassword1",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "c2b1e0f3-8d6a-4c9b-7e5d-0a1b2c3d4e5f",
+      username: "playerTwo",
+      email: "playertwo@example.com",
+      passwordHash: "hashedpassword2",
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  gameRoom_insert(data: {
+    id: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    name: "TestRoom",
+    status: "waiting",
+    maxPlayers: 4,
+    gameVariant: "Classic",
+    createdAt: "2024-01-01T00:00:00Z",
+    creatorId: "d9e7a4b8-2e1c-4f5d-9c3a-1b2f8e7d6a5c"
+  })
+  playerInGame_insertMany(data: [
+    {
+      userId: "d9e7a4b8-2e1c-4f5d-9c3a-1b2f8e7d6a5c",
+      gameRoomId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      joinOrder: 1,
+      currentScore: 0,
+      isWinner: false,
+      createdAt: "2024-01-01T00:00:00Z",
+      cardsInHand: "[]"
+    },
+    {
+      userId: "c2b1e0f3-8d6a-4c9b-7e5d-0a1b2c3d4e5f",
+      gameRoomId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      joinOrder: 2,
+      currentScore: 0,
+      isWinner: false,
+      createdAt: "2024-01-01T00:00:00Z",
+      cardsInHand: "[]"
+    }
+  ])
+  friendship_insert(data: {
+    initiatorId: "d9e7a4b8-2e1c-4f5d-9c3a-1b2f8e7d6a5c",
+    recipientId: "c2b1e0f3-8d6a-4c9b-7e5d-0a1b2c3d4e5f",
+    status: "accepted",
+    createdAt: "2024-01-02T00:00:00Z"
+  })
+}

@@ -1,0 +1,52 @@
+query AllGameRooms @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  gameRooms {
+    id
+    name
+    status
+    maxPlayers
+    gameVariant
+    createdAt
+    creator {
+      id
+      username
+    }
+  }
+}
+
+query UserProfile($userId: UUID!) @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  user(id: $userId) {
+    id
+    username
+    email
+    avatarUrl
+    createdAt
+    lastLogin
+  }
+}
+
+mutation CreateGameRoom($name: String!, $status: String!, $maxPlayers: Int!, $gameVariant: String, $password: String) @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  gameRoom_insert(data: {
+    name: $name,
+    status: $status,
+    maxPlayers: $maxPlayers,
+    gameVariant: $gameVariant,
+    password: $password,
+    createdAt_expr: "request.time",
+    creatorId_expr: "auth.uid"
+  }) {
+    id
+  }
+}
+
+mutation RecordGameEvent($gameRoomId: UUID!, $eventType: String!, $cardPlayed: String, $targetPlayerId: UUID) @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  gameEvent_insert(data: {
+    gameRoomId: $gameRoomId,
+    userId_expr: "auth.uid",
+    eventType: $eventType,
+    cardPlayed: $cardPlayed,
+    targetPlayerId: $targetPlayerId,
+    timestamp_expr: "request.time"
+  }) {
+    id
+  }
+}
