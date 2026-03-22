@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, getDocs, deleteDoc, writeBatch, getDoc, DocumentSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, getDocs, deleteDoc, writeBatch, getDoc, DocumentSnapshot, setDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { useGame } from './GameContext';
 import { Room, PlayerState, Card, Scenario } from './types';
-import { createDeck, shuffle, validateWin, botPlay, PENALTY } from './gameLogic';
-import { Beer, Users, Play, LogOut, RefreshCcw, Trophy, ChevronRight, Hand, Flame, Waves, TreePine, Home, Zap, Skull, Frown } from 'lucide-react';
+import { createDeck, shuffle, validateWin, botPlay, PENALTY, INITIAL_SCORE } from './gameLogic';
+import { Beer, Users, Play, LogOut, RefreshCcw, Trophy, ChevronRight, Hand, Flame, Waves, TreePine, Home, Zap, Skull, Frown, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VoiceChat } from './components/VoiceChat';
 
@@ -138,6 +138,44 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
       handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}`);
     } finally {
       setStarting(false);
+    }
+  };
+
+  const handleRequest = async (requestId: string, approve: boolean) => {
+    if (!user || !room || !isCreator) return;
+    const request = room.pendingRequests?.find(r => r.uid === requestId);
+    if (!request) return;
+
+    try {
+      const updatedRequests = room.pendingRequests?.filter(r => r.uid !== requestId) || [];
+      if (approve) {
+        if (room.playerIds.length >= 4) {
+          setGameError("A mesa já está cheia!");
+          return;
+        }
+        const newScores = { ...room.playerScores, [requestId]: INITIAL_SCORE };
+        await updateDoc(doc(db, 'rooms', roomId), {
+          playerIds: arrayUnion(requestId),
+          playerNames: arrayUnion(request.displayName),
+          playerPhotos: arrayUnion(request.photoURL || ''),
+          playerScores: newScores,
+          pendingRequests: updatedRequests,
+          lastActionAt: serverTimestamp(),
+        });
+
+        await setDoc(doc(db, `rooms/${roomId}/playerStates`, requestId), {
+          userId: requestId,
+          hand: [],
+          isReady: false
+        });
+      } else {
+        await updateDoc(doc(db, 'rooms', roomId), {
+          pendingRequests: updatedRequests,
+          lastActionAt: serverTimestamp(),
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}`);
     }
   };
 
@@ -509,6 +547,38 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {isCreator && room.pendingRequests && room.pendingRequests.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, x: 50 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            exit={{ opacity: 0, x: 50 }}
+            className="absolute top-24 right-4 z-[100] flex flex-col gap-3 max-w-[300px] w-full"
+          >
+            {room.pendingRequests.map(req => (
+              <div key={req.uid} className="bg-stone-900/90 backdrop-blur-xl border border-amber-500/40 p-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex items-center justify-between gap-3 overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none"></div>
+                <div className="flex items-center gap-3 relative z-10 w-full">
+                  <img src={req.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${req.uid}`} alt="" className="w-10 h-10 rounded-full border-2 border-amber-500 object-cover shrink-0" referrerPolicy="no-referrer" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm leading-tight truncate">{req.displayName}</p>
+                    <p className="text-amber-500/80 text-[10px] uppercase font-bold tracking-widest mt-0.5">Pede p/ Entrar</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => handleRequest(req.uid, true)} className="w-8 h-8 bg-green-500 hover:bg-green-400 text-white rounded-xl flex items-center justify-center shadow-lg transition-transform hover:scale-110 active:scale-95">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleRequest(req.uid, false)} className="w-8 h-8 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-xl flex items-center justify-center shadow-lg transition-all hover:scale-110 active:scale-95">
+                      <LogOut className="w-3 h-3 rotate-180" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className={`flex-1 relative rounded-[3rem] border-[12px] border-stone-900 shadow-2xl p-8 overflow-hidden`}>
         {/* Background Image - More Realistic */}
