@@ -714,7 +714,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
         )}
       </AnimatePresence>
 
-      <div className={`flex-1 relative rounded-[3rem] border-[12px] border-stone-900 shadow-2xl p-8 overflow-hidden`}>
+      <div className={`flex-1 relative rounded-[3rem] border-[12px] border-stone-900 shadow-2xl p-8 overflow-hidden transform scale-[0.85] lg:scale-95 origin-center max-w-[1400px] mx-auto w-full`}>
         {/* Background Image - More Realistic */}
         <div 
           className="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105"
@@ -783,6 +783,8 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           const pState = allPlayerStates[pid];
           const isReady = pState?.isReady;
           
+          if (pid === user?.uid) return null; // Esconder perfil próprio da rodada da mesa
+
           return (
             <div 
               key={pid} 

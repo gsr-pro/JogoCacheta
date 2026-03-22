@@ -14,6 +14,7 @@ interface ChatMessage {
   id: string;
   uid: string;
   senderName: string;
+  senderPhotoURL?: string;
   text: string;
   createdAt: any;
 }
@@ -40,6 +41,7 @@ export function TextChat({ roomId, user }: TextChatProps) {
           id: doc.id,
           uid: data.uid,
           senderName: data.senderName,
+          senderPhotoURL: data.senderPhotoURL || '',
           text: data.text,
           createdAt: data.createdAt
         });
@@ -73,6 +75,7 @@ export function TextChat({ roomId, user }: TextChatProps) {
       await addDoc(collection(db, `rooms/${roomId}/messages`), {
         uid: user.uid,
         senderName: user.displayName || 'Jogador',
+        senderPhotoURL: user.photoURL || '',
         text: newMessage.trim(),
         createdAt: serverTimestamp()
       });
@@ -135,7 +138,10 @@ export function TextChat({ roomId, user }: TextChatProps) {
                   return (
                     <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                       {showName && !isMe && (
-                        <span className="text-[10px] text-stone-400 ml-1 mb-1 font-bold">{msg.senderName}</span>
+                        <div className="flex items-center gap-1.5 ml-1 mb-1">
+                          <img src={msg.senderPhotoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.uid}`} alt="" className="w-4 h-4 rounded-full" />
+                          <span className="text-[10px] text-stone-400 font-bold">{msg.senderName}</span>
+                        </div>
                       )}
                       <div 
                         className={`px-3 py-2 rounded-2xl max-w-[85%] text-sm shadow-md ${
@@ -159,6 +165,14 @@ export function TextChat({ roomId, user }: TextChatProps) {
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (newMessage.trim()) {
+                      handleSend(e);
+                    }
+                  }
+                }}
                 placeholder="Escreva algo..."
                 className="flex-1 bg-stone-900 border border-stone-600 rounded-xl px-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
                 autoComplete="off"
