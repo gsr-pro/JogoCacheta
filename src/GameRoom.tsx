@@ -125,7 +125,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
       // Reset turn to the first player still alive
       let firstTurn = 0;
-      while (room.playerScores[room.playerIds[firstTurn]] <= 0 && firstTurn < room.playerIds.length) {
+      while ((room.playerScores?.[room.playerIds[firstTurn]] || 0) <= 0 && firstTurn < room.playerIds.length) {
         firstTurn++;
       }
       if (firstTurn >= room.playerIds.length) firstTurn = 0; // Fallback
@@ -162,7 +162,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           setGameError("A mesa já está cheia!");
           return;
         }
-        const newScores = { ...room.playerScores, [requestId]: INITIAL_SCORE };
+        const newScores = { ...(room.playerScores || {}), [requestId]: INITIAL_SCORE };
         await updateDoc(doc(db, 'rooms', roomId), {
           playerIds: arrayUnion(requestId),
           playerNames: arrayUnion(request.displayName),
@@ -257,7 +257,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     let nextTurn = (room.currentTurnIndex + 1) % room.playerIds.length;
     let nextPid = room.playerIds[nextTurn];
     // Skip players who are folded or have 0 points
-    while (allPlayerStates[nextPid]?.isFolded || (room.playerScores[nextPid] !== undefined && room.playerScores[nextPid] <= 0)) {
+    while (allPlayerStates[nextPid]?.isFolded || (room.playerScores?.[nextPid] !== undefined && room.playerScores[nextPid] <= 0)) {
       nextTurn = (nextTurn + 1) % room.playerIds.length;
       nextPid = room.playerIds[nextTurn];
       if (nextTurn === room.currentTurnIndex) break; // Infinite loop safety
@@ -282,7 +282,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     if (playerState.hand.length !== 10) return;
 
     if (validateWin(playerState.hand, room.vira)) {
-      const newScores = { ...room.playerScores };
+      const newScores = { ...(room.playerScores || {}) };
       const winnerId = user.uid;
       
       // Penalize others (only if they haven't folded)
@@ -317,7 +317,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     if (room.status !== 'playing' || playerState.isFolded) return;
 
     try {
-      const newScores = { ...room.playerScores };
+      const newScores = { ...(room.playerScores || {}) };
       newScores[user.uid] = Math.max(0, (newScores[user.uid] || 0) - FOLD_PENALTY);
 
       await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
@@ -684,7 +684,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           </h3>
           <div className="flex flex-col gap-2">
             {room.playerIds.map((pid, idx) => {
-              const score = room.playerScores[pid] || 0;
+              const score = room.playerScores?.[pid] || 0;
               const isMe = pid === user?.uid;
               return (
                 <div key={pid} className={`flex items-center justify-between p-2 rounded-xl border ${isMe ? 'bg-amber-500/10 border-amber-500/50' : 'bg-white/5 border-white/5'}`}>
