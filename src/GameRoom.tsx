@@ -3,10 +3,11 @@ import { doc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, 
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { useGame } from './GameContext';
 import { Room, PlayerState, Card, Scenario } from './types';
-import { createDeck, shuffle, validateWin, botPlay, PENALTY, INITIAL_SCORE } from './gameLogic';
+import { createDeck, shuffle, validateWin, botPlay, PENALTY, INITIAL_SCORE, FOLD_PENALTY } from './gameLogic';
 import { Beer, Users, Play, LogOut, RefreshCcw, Trophy, ChevronRight, Hand, Flame, Waves, TreePine, Home, Zap, Skull, Frown, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VoiceChat } from './components/VoiceChat';
+import { TextChat } from './components/TextChat';
 
 export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ roomId, onLeave }) => {
   const { user, profile } = useGame();
@@ -117,16 +118,24 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
         batch.set(playerStateRef, { 
           hand, 
           userId: uid,
-          isReady: true 
+          isReady: true,
+          isFolded: false
         }, { merge: true });
       }
+
+      // Reset turn to the first player still alive
+      let firstTurn = 0;
+      while (room.playerScores[room.playerIds[firstTurn]] <= 0 && firstTurn < room.playerIds.length) {
+        firstTurn++;
+      }
+      if (firstTurn >= room.playerIds.length) firstTurn = 0; // Fallback
 
       batch.update(doc(db, 'rooms', roomId), {
         status: 'playing',
         deck,
         discardPile: [],
         vira: deck.pop(),
-        currentTurnIndex: 0,
+        currentTurnIndex: firstTurn,
         lastActionAt: serverTimestamp(),
       });
 
@@ -244,7 +253,15 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
     const newHand = playerState.hand.filter(c => c.id !== cardId);
     const newDiscard = [...room.discardPile, cardToDiscard];
-    const nextTurn = (room.currentTurnIndex + 1) % room.playerIds.length;
+    
+    let nextTurn = (room.currentTurnIndex + 1) % room.playerIds.length;
+    let nextPid = room.playerIds[nextTurn];
+    // Skip players who are folded or have 0 points
+    while (allPlayerStates[nextPid]?.isFolded || (room.playerScores[nextPid] !== undefined && room.playerScores[nextPid] <= 0)) {
+      nextTurn = (nextTurn + 1) % room.playerIds.length;
+      nextPid = room.playerIds[nextTurn];
+      if (nextTurn === room.currentTurnIndex) break; // Infinite loop safety
+    }
 
     try {
       await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
@@ -268,9 +285,9 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
       const newScores = { ...room.playerScores };
       const winnerId = user.uid;
       
-      // Penalize others
+      // Penalize others (only if they haven't folded)
       room.playerIds.forEach(pid => {
-        if (pid !== winnerId) {
+        if (pid !== winnerId && !allPlayerStates[pid]?.isFolded) {
           newScores[pid] = Math.max(0, (newScores[pid] || 0) - PENALTY);
         }
       });
@@ -292,6 +309,58 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     } else {
       setGameError("Mão inválida para bater! Você precisa de 3 trincas/sequências e 1 carta sobrando.");
       setTimeout(() => setGameError(null), 4000);
+    }
+  };
+
+  const correrRound = async () => {
+    if (!room || !playerState || !user) return;
+    if (room.status !== 'playing' || playerState.isFolded) return;
+
+    try {
+      const newScores = { ...room.playerScores };
+      newScores[user.uid] = Math.max(0, (newScores[user.uid] || 0) - FOLD_PENALTY);
+
+      await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
+        isFolded: true
+      });
+
+      const isMyTurn = room.playerIds[room.currentTurnIndex] === user.uid;
+      let nextTurn = room.currentTurnIndex;
+
+      // Filter who is still alive in the round
+      const activePlayers = room.playerIds.filter(pid => 
+        pid === user.uid ? false : (!allPlayerStates[pid]?.isFolded && (newScores[pid] === undefined || newScores[pid] > 0))
+      );
+
+      if (activePlayers.length <= 1) {
+        // Only one player left! They win!
+        const winnerId = activePlayers[0] || room.playerIds[0];
+        
+        // As a rule, the winner doesn't lose points. Other folded players already lost 1.
+        await updateDoc(doc(db, 'rooms', roomId), {
+          status: 'finished',
+          winnerId: winnerId,
+          playerScores: newScores,
+          lastActionAt: serverTimestamp(),
+        });
+      } else {
+        if (isMyTurn) {
+          // Advance the turn to the next player that hasn't folded
+          do {
+            nextTurn = (nextTurn + 1) % room.playerIds.length;
+          } while (
+            allPlayerStates[room.playerIds[nextTurn]]?.isFolded || 
+            (newScores[room.playerIds[nextTurn]] !== undefined && newScores[room.playerIds[nextTurn]] <= 0)
+          );
+        }
+        await updateDoc(doc(db, 'rooms', roomId), {
+          playerScores: newScores,
+          currentTurnIndex: nextTurn,
+          lastActionAt: serverTimestamp(),
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}`);
     }
   };
 
@@ -608,6 +677,38 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           </div>
         </div>
 
+        {/* Placar (Scoreboard) Elegante */}
+        <div className="absolute top-8 left-8 z-40 bg-stone-900/80 backdrop-blur-xl border border-amber-500/30 rounded-3xl p-4 shadow-2xl min-w-[200px]">
+          <h3 className="text-amber-500 font-bold font-serif italic text-lg mb-3 flex items-center gap-2">
+            <Trophy className="w-5 h-5" /> Placar
+          </h3>
+          <div className="flex flex-col gap-2">
+            {room.playerIds.map((pid, idx) => {
+              const score = room.playerScores[pid] || 0;
+              const isMe = pid === user?.uid;
+              return (
+                <div key={pid} className={`flex items-center justify-between p-2 rounded-xl border ${isMe ? 'bg-amber-500/10 border-amber-500/50' : 'bg-white/5 border-white/5'}`}>
+                  <div className="flex items-center gap-2">
+                    <img src={room.playerPhotos?.[idx] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pid}`} alt="" className="w-8 h-8 rounded-full border border-white/20" />
+                    <span className={`text-sm font-bold truncate max-w-[80px] ${isMe ? 'text-amber-500' : 'text-white'}`}>{room.playerNames[idx]}</span>
+                  </div>
+                  <div className="bg-black/50 px-3 py-1 rounded-lg text-amber-500 font-black text-sm shadow-inner flex items-center gap-1">
+                    {allPlayerStates[pid]?.isFolded && <LogOut className="w-3 h-3 text-red-500" />}
+                    {score} pts
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Chat de Texto */}
+        {user && (
+          <div className="absolute bottom-8 left-8 z-50">
+            <TextChat roomId={roomId} user={user} />
+          </div>
+        )}
+
         {/* Jogadores ao redor da mesa */}
         {room.playerIds.map((pid, idx) => {
           const pos = getPlayerPosition(idx, room.playerIds.length);
@@ -646,10 +747,13 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
               </div>
               <div className="text-center">
                 <span className="text-sm text-white font-bold block">{room.playerNames[idx]}</span>
-                {room.status === 'playing' && pState && (
+                {room.status === 'playing' && pState && !pState.isFolded && (
                   <span className="text-xs text-white/60 block">{pState.hand.length} cartas</span>
                 )}
-                {isCurrentTurn && <span className="text-[10px] text-amber-500 uppercase font-black tracking-widest">Sua Vez</span>}
+                {room.status === 'playing' && pState?.isFolded && (
+                  <span className="text-xs text-red-500 font-bold uppercase block tracking-widest mt-1">Correu</span>
+                )}
+                {isCurrentTurn && !pState?.isFolded && <span className="text-[10px] text-amber-500 uppercase font-black tracking-widest">Sua Vez</span>}
                 {room.status === 'waiting' && (
                   <span className={`text-[10px] uppercase font-black tracking-widest ${isReady ? 'text-green-500' : 'text-white/20 animate-pulse'}`}>
                     {isReady ? 'Pronto' : 'Aguardando'}
@@ -761,7 +865,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
         </div>
 
         {/* Controles de Jogo */}
-        <div className="absolute bottom-40 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
+        <div className="absolute bottom-40 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-50">
           <AnimatePresence>
             {gameError && (
               <motion.div
@@ -839,11 +943,22 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
               <p className="text-white/40 italic text-xs">Aguardando o dono da mesa iniciar o jogo...</p>
             </div>
           ) : null}
-          {canDiscard && (
-            <button onClick={bate} className="flex items-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-full shadow-xl uppercase tracking-widest transition-all">
-              <Trophy className="w-5 h-5" /> Bater!
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {canDiscard && !playerState?.isFolded && (
+              <button onClick={bate} className="flex items-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-full shadow-xl uppercase tracking-widest transition-all">
+                <Trophy className="w-5 h-5" /> Bater!
+              </button>
+            )}
+            {room.status === 'playing' && !playerState?.isFolded && (
+              <button 
+                onClick={correrRound} 
+                className="flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full shadow-xl uppercase tracking-widest transition-all"
+                title="Desistir da rodada e perder apenas 1 ponto"
+              >
+                <LogOut className="w-4 h-4" /> Correr
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Overlay de Ajuda */}

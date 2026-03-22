@@ -187,6 +187,7 @@ function getCombinations<T>(array: T[], size: number): T[][] {
 
 export const INITIAL_SCORE = 10;
 export const PENALTY = 2;
+export const FOLD_PENALTY = 1;
 
 export function botPlay(hand: Card[], discardPile: Card[], deck: Card[], vira?: Card): { action: 'draw_deck' | 'draw_discard', discardId: string } {
   // Simple Bot Logic:

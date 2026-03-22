@@ -98,6 +98,7 @@ export interface PlayerState {
   userId: string;
   hand: Card[];
   isReady: boolean;
+  isFolded?: boolean;
 }
 
 export interface GameState {
