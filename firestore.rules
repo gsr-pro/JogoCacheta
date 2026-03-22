@@ -169,6 +169,10 @@ service cloud.firestore {
       );
       allow delete: if isAuthenticated() && (request.auth.uid == resource.data.creatorId || isAdmin());
 
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+
       match /playerStates/{userId} {
         allow read: if isAuthenticated(); // Allow reading other players' state for bot logic if needed, or just keep it private
         allow create: if isAuthenticated(); // Allow creator to set initial state
