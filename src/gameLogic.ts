@@ -4,10 +4,10 @@ const SUITS: Card['suit'][] = ['hearts', 'diamonds', 'clubs', 'spades'];
 const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 const LABELS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-export function createDeck(): Card[] {
+export function createDeck(deckCount: number = 2): Card[] {
   const deck: Card[] = [];
   // 2 baralhos (104 cartas)
-  for (let b = 1; b <= 2; b++) {
+  for (let b = 1; b <= deckCount; b++) {
     for (const suit of SUITS) {
       for (let i = 0; i < VALUES.length; i++) {
         deck.push({
@@ -31,7 +31,7 @@ export function shuffle<T>(array: T[]): T[] {
   return newArray;
 }
 
-export function validateWin(hand: Card[], vira?: Card): boolean {
+export function validateWin(hand: Card[], vira?: Card, curingaMode: 'original' | 'all' = 'original'): boolean {
   if (hand.length !== 10) return false;
 
   // Determine Curinga value
@@ -43,19 +43,19 @@ export function validateWin(hand: Card[], vira?: Card): boolean {
   // Tenta todas as possibilidades de remover 1 carta e ver se as 9 restantes formam jogos
   for (let i = 0; i < hand.length; i++) {
     const handWithoutOne = hand.filter((_, idx) => idx !== i);
-    if (findGames(handWithoutOne, curingaValue)) return true;
+    if (findGames(handWithoutOne, curingaValue, vira?.suit, curingaMode)) return true;
   }
 
   // Também verifica se as 10 cartas formam jogos (ex: 3+3+4)
-  return findGames(hand, curingaValue);
+  return findGames(hand, curingaValue, vira?.suit, curingaMode);
 
-  function findGames(remaining: Card[], curingaVal: number): boolean {
+  function findGames(remaining: Card[], curingaVal: number, viraSuit?: Card['suit'], curingaMode: 'original' | 'all' = 'original'): boolean {
     if (remaining.length === 0) return true;
     if (remaining.length < 3) return false;
 
     // Separate curingas from normal cards
-    const curingas = remaining.filter(c => c.value === curingaVal);
-    const normals = remaining.filter(c => c.value !== curingaVal);
+    const curingas = remaining.filter(c => c.value === curingaVal && (curingaMode === 'all' || c.suit === viraSuit));
+    const normals = remaining.filter(c => !(c.value === curingaVal && (curingaMode === 'all' || c.suit === viraSuit)));
 
     // If we have enough curingas to form a group by themselves, we can just treat them as valid
     // But usually curingas are used to substitute.
@@ -81,16 +81,16 @@ export function validateWin(hand: Card[], vira?: Card): boolean {
 
     // Since Cacheta can be complex with Curingas, let's use a simpler backtracking approach.
     // We will generate all possible valid groups (trincas and sequencias) from the remaining cards.
-    return backtrackGroups(remaining, curingaVal);
+    return backtrackGroups(remaining, curingaVal, viraSuit, curingaMode);
   }
 }
 
-function backtrackGroups(cards: Card[], curingaVal: number): boolean {
+function backtrackGroups(cards: Card[], curingaVal: number, viraSuit?: Card['suit'], curingaMode: 'original' | 'all' = 'original'): boolean {
   if (cards.length === 0) return true;
   if (cards.length < 3) return false;
 
-  const curingas = cards.filter(c => c.value === curingaVal);
-  const normals = cards.filter(c => c.value !== curingaVal);
+  const curingas = cards.filter(c => c.value === curingaVal && (curingaMode === 'all' || c.suit === viraSuit));
+  const normals = cards.filter(c => !(c.value === curingaVal && (curingaMode === 'all' || c.suit === viraSuit)));
 
   if (normals.length === 0) return true;
 
@@ -118,7 +118,7 @@ function backtrackGroups(cards: Card[], curingaVal: number): boolean {
               ...normals.filter(c => !groupNormals.find(gn => gn.id === c.id)),
               ...curingas.slice(neededCuringas)
             ];
-            if (backtrackGroups(nextCards, curingaVal)) return true;
+            if (backtrackGroups(nextCards, curingaVal, viraSuit, curingaMode)) return true;
           }
         }
       }
@@ -160,7 +160,7 @@ function backtrackGroups(cards: Card[], curingaVal: number): boolean {
           ...normals.filter(c => !groupNormals.find(gn => gn.id === c.id)),
           ...curingas.slice(neededCuringas)
         ];
-        if (backtrackGroups(nextCards, curingaVal)) return true;
+        if (backtrackGroups(nextCards, curingaVal, viraSuit, curingaMode)) return true;
       }
     }
   }

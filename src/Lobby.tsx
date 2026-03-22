@@ -19,8 +19,25 @@ export const Lobby: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [creating, setCreating] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<Scenario>('bar');
+  const [gameMode, setGameMode] = useState<'pife' | 'cacheta'>('cacheta');
+  const [curingaMode, setCuringaMode] = useState<'original' | 'all'>('original');
   const [isStoreOpen, setIsStoreOpen] = useState(false);
   const [welcomeFriend, setWelcomeFriend] = useState<UserProfile | null>(null);
+
+
+  useEffect(() => {
+    if (!showRanking) return;
+    const fetchRanking = async () => {
+      try {
+        const q = query(collection(db, 'users'), orderBy('matchesWon', 'desc'), limit(10));
+        const snap = await getDocs(q);
+        setRankings(snap.docs.map(d => d.data() as UserProfile));
+      } catch (err) {
+        console.error("Erro ao buscar ranking:", err);
+      }
+    };
+    fetchRanking();
+  }, [showRanking]);
 
   const myRoom = rooms.find(r => r.creatorId === user?.uid);
 

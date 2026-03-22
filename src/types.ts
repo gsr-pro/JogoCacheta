@@ -72,9 +72,11 @@ export interface JoinRequest {
 }
 
 export interface Room {
+  gameMode?: 'pife' | 'cacheta';
+  curingaMode?: 'original' | 'all';
   id: string;
   name: string;
-  status: 'waiting' | 'playing' | 'finished';
+  status: 'waiting' | 'dealing' | 'decision' | 'playing' | 'finished';
   scenario: Scenario;
   betAmount: number;
   maxPlayers: number;
@@ -99,6 +101,7 @@ export interface PlayerState {
   hand: Card[];
   isReady: boolean;
   isFolded?: boolean;
+  decisionMade?: boolean;
 }
 
 export interface GameState {
