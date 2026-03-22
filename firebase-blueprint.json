@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and stats",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "coins": { "type": "integer" },
+        "matchesWon": { "type": "integer" },
+        "matchesPlayed": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "coins"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "A game room/table in the bar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] },
+        "betAmount": { "type": "integer" },
+        "maxPlayers": { "type": "integer" },
+        "playerIds": { "type": "array", "items": { "type": "string" } },
+        "playerNames": { "type": "array", "items": { "type": "string" } },
+        "currentTurnIndex": { "type": "integer" },
+        "deck": { "type": "array", "items": { "type": "object" } },
+        "discardPile": { "type": "array", "items": { "type": "object" } },
+        "winnerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastActionAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status", "betAmount", "maxPlayers"]
+    },
+    "PlayerState": {
+      "title": "PlayerState",
+      "description": "Private state of a player in a room",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "hand": { "type": "array", "items": { "type": "object" } },
+        "isReady": { "type": "boolean" }
+      },
+      "required": ["userId", "hand"]
+    },
+    "FriendRequest": {
+      "title": "FriendRequest",
+      "description": "A request to become friends",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fromId": { "type": "string" },
+        "fromName": { "type": "string" },
+        "fromPhoto": { "type": "string" },
+        "toId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fromId", "toId", "status"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "A confirmed friendship between two users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uids": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uids"]
+    },
+    "Invite": {
+      "title": "Invite",
+      "description": "A game invitation sent to a friend.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fromId": { "type": "string" },
+        "fromName": { "type": "string" },
+        "toId": { "type": "string" },
+        "roomId": { "type": "string" },
+        "roomName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fromId", "fromName", "toId", "roomId", "roomName", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Active game rooms"
+    },
+    "/rooms/{roomId}/playerStates/{userId}": {
+      "schema": "PlayerState",
+      "description": "Private player hands and state"
+    },
+    "/friendRequests/{requestId}": {
+      "schema": "FriendRequest",
+      "description": "Pending and past friend requests"
+    },
+    "/friendships/{friendshipId}": {
+      "schema": "Friendship",
+      "description": "Active friendships"
+    },
+    "/invites/{inviteId}": {
+      "schema": "Invite",
+      "description": "Game invitations"
+    }
+  }
+}

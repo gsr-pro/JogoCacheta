@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Document ID: userId (UID from Auth)
+    // Fields:
+    //   - uid: string (required) - The user's UID
+    //   - displayName: string (required) - The user's display name
+    //   - photoURL: string (optional) - The user's photo URL
+    //   - coins: number (required) - The user's coin balance
+    //   - matchesWon: number (optional) - Number of matches won
+    //   - matchesPlayed: number (optional) - Number of matches played
+    //   - createdAt: timestamp (optional) - When the user was created
+    //
+    // Collection: /rooms/{roomId}
+    // Document ID: generated ID
+    // Fields:
+    //   - name: string (required) - Room name
+    //   - status: string (required) - "waiting", "playing", "finished"
+    //   - betAmount: number (required) - Bet amount
+    //   - maxPlayers: number (required) - Max players (2-6)
+    //   - playerIds: list (required) - List of player UIDs
+    //   - playerNames: list (required) - List of player names
+    //   - currentTurnIndex: number (optional) - Index of the player whose turn it is
+    //   - deck: list (optional) - The deck of cards
+    //   - discardPile: list (optional) - The discard pile
+    //   - winnerId: string (optional) - The winner's UID
+    //   - createdAt: timestamp (optional) - When the room was created
+    //   - lastActionAt: timestamp (optional) - When the last action was taken
+    //
+    // Collection: /rooms/{roomId}/playerStates/{userId}
+    // Document ID: userId (UID from Auth)
+    // Fields:
+    //   - userId: string (required) - The player's UID
+    //   - hand: list (required) - The player's private hand
+    //   - isReady: bool (optional) - Whether the player is ready
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "gabrielsantosrocha.pro@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'displayName', 'photoURL', 'coins', 'matchesWon', 'matchesPlayed', 'createdAt', 'lastSeen', 'role', 'preferredScenario']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 50 &&
+             (data.photoURL == null || isValidUrl(data.photoURL)) &&
+             data.coins is number && data.coins >= 0;
+    }
+
+    function isValidFriendRequest(data) {
+      return hasRequiredFields(['fromId', 'fromName', 'toId', 'status']) &&
+             data.fromId is string && data.fromId == request.auth.uid &&
+             data.toId is string &&
+             data.status in ['pending', 'accepted', 'rejected'];
+    }
+
+    function isValidFriendship(data) {
+      return hasRequiredFields(['uids']) &&
+             data.uids is list && data.uids.size() == 2 &&
+             request.auth.uid in data.uids;
+    }
+
+    function isValidRoom(data) {
+      return hasRequiredFields(['name', 'status', 'betAmount', 'maxPlayers', 'playerIds', 'playerNames', 'scenario', 'isBotGame', 'creatorId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.status in ['waiting', 'playing', 'finished'] &&
+             data.betAmount is number && data.betAmount >= 0 &&
+             data.maxPlayers is number && data.maxPlayers >= 2 && data.maxPlayers <= 6 &&
+             data.playerIds is list && data.playerIds.size() <= 6 &&
+             data.playerNames is list && data.playerNames.size() <= 6 &&
+             (data.playerPhotos == null || (data.playerPhotos is list && data.playerPhotos.size() <= 6)) &&
+             (data.playerScores == null || data.playerScores is map) &&
+             data.scenario in ['bar', 'churrasco', 'praia', 'sitio', 'quintal'] &&
+             data.isBotGame is bool &&
+             data.creatorId is string &&
+             (data.pendingRequests == null || data.pendingRequests is list) &&
+             (data.currentTurnIndex == null || data.currentTurnIndex is number) &&
+             (data.deck == null || data.deck is list) &&
+             (data.discardPile == null || data.discardPile is list) &&
+             (data.winnerId == null || data.winnerId is string);
+    }
+
+    function isValidPlayerState(data) {
+      return hasRequiredFields(['userId', 'hand']) &&
+             data.userId is string &&
+             data.hand is list && data.hand.size() <= 11;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.coins == 1000;
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+      allow create: if isAuthenticated() && isValidFriendRequest(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.toId) && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+    }
+
+    match /friendships/{friendshipId} {
+      allow read: if isAuthenticated() && (request.auth.uid in resource.data.uids);
+      allow create: if isAuthenticated() && isValidFriendship(request.resource.data);
+      allow update: if false;
+      allow delete: if isAuthenticated() && (request.auth.uid in resource.data.uids);
+    }
+
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.fromId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.toId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+    }
+
+    match /rooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidRoom(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.creatorId) || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests', 'lastActionAt']))
+      );
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.creatorId || isAdmin());
+
+      match /playerStates/{userId} {
+        allow read: if isAuthenticated(); // Allow reading other players' state for bot logic if needed, or just keep it private
+        allow create: if isAuthenticated(); // Allow creator to set initial state
+        allow update: if isAuthenticated(); // Allow creator to distribute cards and bot logic
+        allow delete: if isAuthenticated();
+      }
+
+      match /voice/{userId} {
+        allow read, write: if isAuthenticated();
+        match /offers/{fromId} { allow read, write: if isAuthenticated(); }
+        match /answers/{fromId} { allow read, write: if isAuthenticated(); }
+        match /candidates/{candidateId} { allow read, write: if isAuthenticated(); }
+      }
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
