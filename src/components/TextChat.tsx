@@ -69,18 +69,24 @@ export function TextChat({ roomId, user }: TextChatProps) {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !user) {
+      console.warn("Chat: Tentativa de envio inválida (mensagem vazia ou sem usuário)");
+      return;
+    }
 
     try {
+      console.log("Chat: Enviando para Firestore...", { roomId, text: newMessage.trim() });
       await addDoc(collection(db, `rooms/${roomId}/messages`), {
         uid: user.uid,
         senderName: user.displayName || 'Jogador',
-        senderPhotoURL: user.photoURL || '',
+        senderPhotoURL: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
         text: newMessage.trim(),
         createdAt: serverTimestamp()
       });
+      console.log("Chat: Enviado com sucesso!");
       setNewMessage('');
     } catch (error) {
+      console.error("Chat: Erro ao enviar mensagem:", error);
       handleFirestoreError(error, OperationType.WRITE, `rooms/${roomId}/messages`);
     }
   };

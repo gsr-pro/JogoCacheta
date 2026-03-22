@@ -616,37 +616,16 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   };
 
   const getPlayerPosition = (index: number, total: number) => {
-    if (!user || !room) return 'bottom';
+    if (!user || !room) return 0;
     const myIndex = room.playerIds.indexOf(user.uid);
-    const relativeIndex = (index - myIndex + total) % total;
-
-    if (total === 2) {
-      return relativeIndex === 0 ? 'bottom' : 'top';
-    }
-    if (total === 3) {
-      if (relativeIndex === 0) return 'bottom';
-      if (relativeIndex === 1) return 'top-right';
-      return 'top-left';
-    }
-    if (total === 4) {
-      if (relativeIndex === 0) return 'bottom';
-      if (relativeIndex === 1) return 'left';
-      if (relativeIndex === 2) return 'top';
-      return 'right';
-    }
-    return 'bottom';
+    // Retorna a posição relativa (0 é a minha posição na parte inferior)
+    return (index - myIndex + total) % total;
   };
 
-  const getPosClasses = (pos: string) => {
-    switch (pos) {
-      case 'bottom': return 'bottom-0 left-1/2 -translate-x-1/2';
-      case 'top': return 'top-0 left-1/2 -translate-x-1/2';
-      case 'left': return 'left-0 top-1/2 -translate-y-1/2';
-      case 'right': return 'right-0 top-1/2 -translate-y-1/2';
-      case 'top-left': return 'top-4 left-4';
-      case 'top-right': return 'top-4 right-4';
-      default: return '';
-    }
+  const getPosClasses = (pos: number, total: number) => {
+    // Esta função agora é secundária, já que usamos getPlayerStyle para absolute.
+    // Mas mantemos por compatibilidade se algo mais as usar.
+    return '';
   };
 
   if (loading) return <div className="p-12 text-center text-white">Entrando na mesa...</div>;
@@ -810,8 +789,8 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           return (
             <div 
               key={pid} 
-              className={`absolute flex items-center gap-2 p-4 rounded-[2rem] transition-all z-10 ${flexClass} ${isCurrentTurn ? 'bg-amber-500/20 ring-4 ring-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-black/20 backdrop-blur-sm'}`}
-              style={getPlayerStyle(Number(pos), Number(total))}
+              className={`absolute flex items-center gap-2 p-4 rounded-[2rem] transition-all z-50 ${flexClass} ${isCurrentTurn ? 'bg-amber-500/20 ring-4 ring-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-black/20 backdrop-blur-sm'}`}
+              style={getPlayerStyle(pos, total)}
             >
               <div className="relative">
                 <img 
