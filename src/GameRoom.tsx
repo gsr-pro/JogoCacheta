@@ -660,8 +660,17 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
   const curingaValue = room.vira ? (room.vira.value === 13 ? 1 : room.vira.value + 1) : -1;
 
+  useEffect(() => {
+    // Tentar forçar orientação landscape em dispositivos móveis
+    try {
+      if (screen.orientation && (screen.orientation as any).lock) {
+        (screen.orientation as any).lock('landscape').catch(() => {});
+      }
+    } catch(e) {}
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col p-4">
+    <div className="h-screen w-full flex flex-col p-2 lg:p-4 overflow-hidden relative selection:bg-transparent">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <scenarioConfig.icon className="w-8 h-8 text-amber-500" />
@@ -714,7 +723,43 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
         )}
       </AnimatePresence>
 
-      <div className={`flex-1 relative rounded-[3rem] border-[12px] border-stone-900 shadow-2xl p-8 overflow-hidden transform scale-[0.85] lg:scale-95 origin-center max-w-[1400px] mx-auto w-full`}>
+      <div className="flex-1 flex gap-6 mt-4 w-full max-w-[1800px] mx-auto min-h-0 relative">
+        
+        {/* Lado Esquerdo - Sidebar do Placar */}
+        <div className="hidden lg:flex flex-col w-[300px] shrink-0 gap-4 overflow-hidden relative z-40">
+          <div className="bg-stone-900/80 backdrop-blur-xl border-2 border-amber-500/30 rounded-3xl p-4 shadow-2xl flex-1 flex flex-col overflow-y-auto custom-scrollbar">
+            <h3 className="text-amber-500 font-bold font-serif italic text-lg mb-4 flex items-center gap-2 sticky top-0 bg-stone-900/90 p-2 rounded-xl z-10">
+              <Trophy className="w-6 h-6" /> Placar da Mesa
+            </h3>
+            <div className="flex flex-col gap-3">
+              {room.playerIds.map((pid, idx) => {
+                const score = room.playerScores?.[pid] || 0;
+                const isMe = pid === user?.uid;
+                const pState = allPlayerStates[pid];
+                return (
+                  <div key={pid} className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${isMe ? 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <img src={room.playerPhotos?.[idx] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pid}`} alt="" className="w-10 h-10 rounded-full border-2 border-white/20 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-sm font-bold truncate max-w-[120px] ${isMe ? 'text-amber-500' : 'text-stone-200'}`}>
+                          {room.playerNames[idx]}
+                        </span>
+                        {pState?.isFolded && <span className="text-[10px] text-red-500 font-bold uppercase">Correu</span>}
+                      </div>
+                    </div>
+                    <div className="bg-black/60 px-3 py-1.5 rounded-xl text-amber-500 font-black text-sm shadow-inner flex items-center gap-1.5 shrink-0 border border-white/5">
+                      {score} <span className="text-[10px] text-amber-500/60 uppercase">pts</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Lado Direito - Mesa (Game Board) */}
+        <div className="flex-1 flex justify-center items-center relative min-w-0">
+          <div className={`w-full max-w-5xl aspect-[16/10] sm:aspect-video relative rounded-[3rem] border-[12px] border-stone-900 shadow-2xl p-8 overflow-hidden mx-auto`}>
         {/* Background Image - More Realistic */}
         <div 
           className="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105"
@@ -742,30 +787,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           </div>
         </div>
 
-        {/* Placar (Scoreboard) Elegante */}
-        <div className="absolute top-8 left-8 z-40 bg-stone-900/80 backdrop-blur-xl border border-amber-500/30 rounded-3xl p-4 shadow-2xl min-w-[200px]">
-          <h3 className="text-amber-500 font-bold font-serif italic text-lg mb-3 flex items-center gap-2">
-            <Trophy className="w-5 h-5" /> Placar
-          </h3>
-          <div className="flex flex-col gap-2">
-            {room.playerIds.map((pid, idx) => {
-              const score = room.playerScores?.[pid] || 0;
-              const isMe = pid === user?.uid;
-              return (
-                <div key={pid} className={`flex items-center justify-between p-2 rounded-xl border ${isMe ? 'bg-amber-500/10 border-amber-500/50' : 'bg-white/5 border-white/5'}`}>
-                  <div className="flex items-center gap-2">
-                    <img src={room.playerPhotos?.[idx] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pid}`} alt="" className="w-8 h-8 rounded-full border border-white/20" />
-                    <span className={`text-sm font-bold truncate max-w-[80px] ${isMe ? 'text-amber-500' : 'text-white'}`}>{room.playerNames[idx]}</span>
-                  </div>
-                  <div className="bg-black/50 px-3 py-1 rounded-lg text-amber-500 font-black text-sm shadow-inner flex items-center gap-1">
-                    {allPlayerStates[pid]?.isFolded && <LogOut className="w-3 h-3 text-red-500" />}
-                    {score} pts
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* Placar removido de dentro da mesa */}
 
         {/* Chat de Texto */}
         {user && (
@@ -1033,9 +1055,12 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
               </button>
             )}
           </div>
+          </div>
         </div>
+        </div>
+      </div>
 
-        {/* Overlay de Ajuda */}
+      {/* Overlay de Ajuda */}
         <AnimatePresence>
           {showHelp && (
             <motion.div
@@ -1110,7 +1135,6 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
     </div>
   );
 };
