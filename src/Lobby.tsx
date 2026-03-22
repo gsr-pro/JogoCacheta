@@ -33,6 +33,15 @@ export const Lobby: React.FC = () => {
   }, [location]);
 
   useEffect(() => {
+    try {
+      // @ts-ignore
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {
+      console.error("AdSense error", e);
+    }
+  }, []);
+
+  useEffect(() => {
     const q = query(collection(db, 'rooms'), where('status', '==', 'waiting'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const roomsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Room));
@@ -343,6 +352,20 @@ export const Lobby: React.FC = () => {
             currentRoomId={myRoom?.id} 
             currentRoomName={myRoom?.name} 
           />
+        </div>
+      </div>
+
+      {/* AdSense Unit */}
+      <div className="w-full mt-12 mb-8 bg-black/40 backdrop-blur-sm border border-white/10 rounded-[2rem] p-4 flex flex-col items-center justify-center overflow-hidden min-h-[120px] shadow-2xl relative group">
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-transparent opacity-50 pointer-events-none transition-opacity group-hover:opacity-70"></div>
+        <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold mb-2 z-10">Publicidade</p>
+        <div className="w-full flex justify-center z-10">
+          <ins className="adsbygoogle"
+               style={{ display: 'block', width: '100%', maxWidth: '728px', height: '90px' }}
+               data-ad-client="ca-pub-3602701444744839"
+               data-ad-slot=""
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
         </div>
       </div>
 
