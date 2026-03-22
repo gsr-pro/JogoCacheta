@@ -704,7 +704,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
         {/* Chat de Texto */}
         {user && (
-          <div className="absolute bottom-8 left-8 z-50">
+          <div className="absolute bottom-8 right-8 z-50">
             <TextChat roomId={roomId} user={user} />
           </div>
         )}

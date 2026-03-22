@@ -105,17 +105,17 @@ export function TextChat({ roomId, user }: TextChatProps) {
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="absolute bottom-16 right-0 w-80 bg-stone-900/95 backdrop-blur-xl border-2 border-stone-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-            style={{ height: '400px' }}
+            className="absolute bottom-16 right-0 w-80 sm:w-96 h-[400px] max-h-[70vh] bg-stone-900/95 backdrop-blur-xl border-2 border-amber-500/30 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-stone-800 p-3 flex justify-between items-center border-b border-stone-700">
+            <div className="bg-stone-800/80 p-3 flex justify-between items-center border-b border-amber-500/20">
               <span className="text-amber-500 font-bold font-serif italic text-lg flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" /> Chat
+                <MessageSquare className="w-5 h-5" /> Chat da Mesa
               </span>
               <button 
                 onClick={() => setIsOpen(false)}
                 className="text-stone-400 hover:text-white transition-colors"
+                title="Fechar Chat"
               >
                 <X className="w-5 h-5" />
               </button>
