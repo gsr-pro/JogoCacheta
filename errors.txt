@@ -1,0 +1,10 @@
+src/GameRoom.tsx(757,42): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+src/GameRoom.tsx(766,37): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+  Type 'string' is not assignable to type 'number'.
+src/GameRoom.tsx(931,28): error TS2304: Cannot find name 'countdown'.
+src/GameRoom.tsx(931,50): error TS2304: Cannot find name 'countdown'.
+src/GameRoom.tsx(933,33): error TS2304: Cannot find name 'countdown'.
+src/GameRoom.tsx(945,56): error TS2304: Cannot find name 'countdown'.
+src/GameRoom.tsx(957,54): error TS2304: Cannot find name 'countdown'.
+src/GameRoom.tsx(958,259): error TS2304: Cannot find name 'countdown'.

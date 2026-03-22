@@ -17,6 +17,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   const [loading, setLoading] = useState(true);
   const [gameError, setGameError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -150,6 +151,29 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     }
   };
 
+  useEffect(() => {
+    if (!room || !isCreator || room.status !== 'waiting') return;
+    if (allReady && room.playerIds.length > 1) {
+      setCountdown(3);
+    } else {
+      setCountdown(null);
+    }
+  }, [allReady, isCreator, room?.status, room?.playerIds.length]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      if (isCreator && !starting && room?.status === 'waiting') {
+        startGame();
+      }
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown, isCreator, starting, room?.status]);
+
   const handleRequest = async (requestId: string, approve: boolean) => {
     if (!user || !room || !isCreator) return;
     const request = room.pendingRequests?.find(r => r.uid === requestId);
@@ -158,7 +182,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     try {
       const updatedRequests = room.pendingRequests?.filter(r => r.uid !== requestId) || [];
       if (approve) {
-        if (room.playerIds.length >= 4) {
+        if (room.playerIds.length >= 10) {
           setGameError("A mesa já está cheia!");
           return;
         }
@@ -189,12 +213,21 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   };
 
   const toggleReady = async () => {
-    if (!user || !playerState || room?.status !== 'waiting') return;
+    if (!user || room?.status !== 'waiting') return;
     setGameError(null);
     try {
-      await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
-        isReady: !playerState.isReady
-      });
+      if (!playerState) {
+        await setDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
+          userId: user.uid,
+          hand: [],
+          isReady: true,
+          isFolded: false
+        }, { merge: true });
+      } else {
+        await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
+          isReady: !playerState.isReady
+        });
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}/playerStates/${user.uid}`);
     }
@@ -430,6 +463,38 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
     runBotTurn();
   }, [room?.currentTurnIndex, room?.status]);
+
+  const getPlayerStyle = (pos: number, total: number) => {
+    if (total === 1 || pos === 0) return { bottom: '2rem', left: '50%', transform: 'translateX(-50%)' };
+
+    const angle = (Math.PI / 2) + (pos / total) * 2 * Math.PI;
+    const rx = 42; 
+    const ry = 35; 
+
+    // O offset pode ser ajustado dependendo se quisermos que eles sentem perfeitamente.
+    // Usamos left e top em %. O centro é 50%.
+    const left = 50 + rx * Math.cos(angle);
+    const top = 50 + ry * Math.sin(angle);
+
+    return {
+      left: `${left}%`,
+      top: `${top}%`,
+      transform: 'translate(-50%, -50%)',
+    };
+  };
+
+  const getFlexClass = (pos: number, total: number) => {
+    if (total === 1 || pos === 0) return 'flex-col';
+    
+    const angle = (Math.PI / 2) + (pos / total) * 2 * Math.PI;
+    const left = 50 + 42 * Math.cos(angle);
+    const top = 50 + 35 * Math.sin(angle);
+    
+    if (top < 30) return 'flex-col-reverse';
+    if (left < 30) return 'flex-row';
+    if (left > 70) return 'flex-row-reverse';
+    return 'flex-col';
+  };
 
   const getCardBackClass = () => {
     const cardBack = profile?.equipped?.cardBack || 'card_classic';
@@ -711,8 +776,9 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
         {/* Jogadores ao redor da mesa */}
         {room.playerIds.map((pid, idx) => {
-          const pos = getPlayerPosition(idx, room.playerIds.length);
-          const posClasses = getPosClasses(pos);
+          const total = room.playerIds.length;
+          const pos = getPlayerPosition(idx, total);
+          const flexClass = getFlexClass(Number(pos), Number(total));
           const isCurrentTurn = room.status === 'playing' && room.currentTurnIndex === idx;
           const pState = allPlayerStates[pid];
           const isReady = pState?.isReady;
@@ -720,7 +786,8 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           return (
             <div 
               key={pid} 
-              className={`absolute ${posClasses} flex flex-col items-center gap-2 p-4 rounded-[2rem] transition-all z-10 ${isCurrentTurn ? 'bg-amber-500/20 ring-4 ring-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-black/20 backdrop-blur-sm'}`}
+              className={`absolute flex items-center gap-2 p-4 rounded-[2rem] transition-all z-10 ${flexClass} ${isCurrentTurn ? 'bg-amber-500/20 ring-4 ring-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-black/20 backdrop-blur-sm'}`}
+              style={getPlayerStyle(Number(pos), Number(total))}
             >
               <div className="relative">
                 <img 
@@ -885,6 +952,11 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                   Aguardando todos ficarem prontos...
                 </p>
               )}
+              {allReady && countdown !== null && countdown > 0 && (
+                <p className="text-green-500 font-black text-2xl animate-pulse uppercase tracking-widest bg-black/60 px-8 py-4 rounded-full backdrop-blur-sm border-2 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)]">
+                  Iniciando em {countdown}...
+                </p>
+              )}
               <div className="flex gap-4">
                 {!playerState?.isReady && (
                   <button 
@@ -894,7 +966,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                     Estou Pronto!
                   </button>
                 )}
-                {playerState?.isReady && !allReady && (
+                {playerState?.isReady && (!allReady || countdown === null) && (
                   <button 
                     onClick={toggleReady}
                     className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-black rounded-full shadow-xl uppercase tracking-widest transition-all border border-white/10"
@@ -906,8 +978,8 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                   animate={(starting || !allReady) ? {} : { scale: [1, 1.05, 1] }}
                   transition={{ repeat: Infinity, duration: 2 }}
                   onClick={startGame} 
-                  disabled={starting || !allReady}
-                  className={`flex items-center gap-3 px-12 py-4 text-white font-black rounded-full shadow-[0_0_40px_rgba(217,119,6,0.4)] uppercase tracking-[0.2em] transition-all border-b-4 active:border-b-0 active:translate-y-1 ${(starting || !allReady) ? 'bg-stone-700 border-stone-800 cursor-not-allowed opacity-50' : 'bg-amber-600 hover:bg-amber-500 border-amber-800'}`}
+                  disabled={starting || !allReady || countdown !== null}
+                  className={`flex items-center gap-3 px-12 py-4 text-white font-black rounded-full shadow-[0_0_40px_rgba(217,119,6,0.4)] uppercase tracking-[0.2em] transition-all border-b-4 active:border-b-0 active:translate-y-1 ${(starting || !allReady || countdown !== null) ? 'bg-stone-700 border-stone-800 cursor-not-allowed opacity-50' : 'bg-amber-600 hover:bg-amber-500 border-amber-800'}`}
                 >
                   {starting ? (
                     <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin" />
