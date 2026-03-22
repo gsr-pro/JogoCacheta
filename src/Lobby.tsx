@@ -2,25 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc, setDoc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { useGame } from './GameContext';
-import { Room, PlayerState, Scenario, Invite } from './types';
+import { Room, PlayerState, Scenario, Invite, UserProfile } from './types';
 import { createDeck, INITIAL_SCORE } from './gameLogic';
 import { Beer, Users, Plus, Play, LogOut, TreePine, Waves, Home, Flame, UserPlus } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { FriendsList } from './components/FriendsList';
 import { Store } from './components/Store';
 import { ShoppingBag } from 'lucide-react';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export const Lobby: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile } = useGame();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [creating, setCreating] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<Scenario>('bar');
   const [isStoreOpen, setIsStoreOpen] = useState(false);
+  const [welcomeFriend, setWelcomeFriend] = useState<UserProfile | null>(null);
 
   const myRoom = rooms.find(r => r.creatorId === user?.uid);
+
+  useEffect(() => {
+    if (location.state?.welcomeFriend) {
+      setWelcomeFriend(location.state.welcomeFriend as UserProfile);
+      // Clear state so it doesn't show again on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   useEffect(() => {
     const q = query(collection(db, 'rooms'), where('status', '==', 'waiting'));
@@ -335,6 +345,47 @@ export const Lobby: React.FC = () => {
           />
         </div>
       </div>
+
+      <AnimatePresence>
+        {welcomeFriend && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} 
+              animate={{ scale: 1, y: 0 }} 
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-stone-900 border border-amber-500/30 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl shadow-amber-500/10 relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 to-transparent opacity-50 pointer-events-none"></div>
+              
+              <div className="relative z-10">
+                <div className="mx-auto w-24 h-24 mb-6 relative">
+                  <img src={welcomeFriend.photoURL || ''} alt={welcomeFriend.displayName} className="w-full h-full rounded-full border-4 border-amber-500 object-cover" />
+                  <div className="absolute -bottom-2 -right-2 bg-amber-500 text-stone-900 p-1.5 rounded-full border-2 border-stone-900">
+                    <UserPlus className="w-4 h-4" />
+                  </div>
+                </div>
+                
+                <h2 className="text-2xl font-black text-white italic font-serif tracking-tight mb-2">Bem-vindo ao Boteco!</h2>
+                <p className="text-white/60 mb-8 text-sm leading-relaxed">
+                  Você aceitou o convite de <strong className="text-amber-500">{welcomeFriend.displayName}</strong>. Agora vocês são amigos no jogo e podem jogar juntos!
+                </p>
+                
+                <button 
+                  onClick={() => setWelcomeFriend(null)}
+                  className="w-full py-4 bg-amber-500 text-stone-900 font-black uppercase tracking-widest text-sm rounded-2xl hover:bg-amber-400 transition-colors shadow-lg"
+                >
+                  Bora Jogar!
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

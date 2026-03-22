@@ -193,18 +193,28 @@ function InviteHandler() {
 
     const handleFriendLink = async () => {
       try {
+        const inviterSnap = await getDoc(doc(db, 'users', friendId));
+        const inviterData = inviterSnap.exists() ? inviterSnap.data() : null;
+
         const friendshipId = [user.uid, friendId].sort().join('_');
         const friendshipRef = doc(db, 'friendships', friendshipId);
         const friendshipSnap = await getDoc(friendshipRef);
         
+        let isNewFriend = false;
         if (!friendshipSnap.exists()) {
           await setDoc(friendshipRef, {
             uids: [user.uid, friendId],
             createdAt: serverTimestamp()
           });
           console.log("Amizade ativada via link!");
+          isNewFriend = true;
         }
-        navigate('/', { replace: true });
+        
+        if (isNewFriend && inviterData) {
+          navigate('/', { replace: true, state: { welcomeFriend: inviterData } });
+        } else {
+          navigate('/', { replace: true });
+        }
       } catch (err) {
         console.error("Erro ao processar link de amizade:", err);
         navigate('/', { replace: true });
