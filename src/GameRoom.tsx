@@ -816,7 +816,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                       <img src={room.playerPhotos?.[idx] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pid}`} alt="" className="w-10 h-10 rounded-full border-2 border-white/20 shrink-0" />
                       <div className="flex flex-col min-w-0">
                         <span className={`text-sm font-bold truncate max-w-[120px] ${isMe ? 'text-amber-500' : 'text-stone-200'}`}>
-                          {room.playerNames[idx]}
+                          {room.playerNames?.[idx] || 'Jogador'}
                         </span>
                         {pState?.isFolded && <span className="text-[10px] text-red-500 font-bold uppercase">Correu</span>}
                       </div>
@@ -911,7 +911,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
             <div 
               key={pid} 
               className={`absolute flex items-center gap-2 p-4 rounded-[2rem] transition-all z-50 ${flexClass} ${isCurrentTurn ? 'bg-amber-500/20 ring-4 ring-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-black/20 backdrop-blur-sm'}`}
-              style={getPlayerStyle(pos, total)}
+              style={getPlayerStyle(Number(pos), Number(total))}
             >
               <div className="relative">
                 <img 
@@ -921,7 +921,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs font-black w-8 h-8 rounded-full flex items-center justify-center border-4 border-stone-900 shadow-lg">
-                  {room.playerScores[pid] || 0}
+                  {room.playerScores?.[pid] || 0}
                 </div>
                 {isCurrentTurn && (
                   <motion.div 
@@ -937,7 +937,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                 )}
               </div>
               <div className="text-center">
-                <span className="text-sm text-white font-bold block">{room.playerNames[idx]}</span>
+                <span className="text-sm text-white font-bold block">{room.playerNames?.[idx] || 'Jogador'}</span>
                 {room.status === 'playing' && pState && !pState.isFolded && (
                   <span className="text-xs text-white/60 block">{pState.hand.length} cartas</span>
                 )}
@@ -1209,7 +1209,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
               {(() => {
                 const isWinner = room.winnerId === user?.uid;
                 const WinAnim = getWinAnimation(room.winnerId!);
-                const winnerName = isWinner ? 'VOCÊ' : room.playerNames[room.playerIds.indexOf(room.winnerId!)];
+                const winnerName = isWinner ? 'VOCÊ' : room.playerNames?.[room.playerIds.indexOf(room.winnerId!)] || 'Jogador';
                 return (
                   <>
                     <WinAnim.icon className={`w-32 h-32 mb-6 ${isWinner ? WinAnim.color : 'text-amber-500'} ${isWinner ? WinAnim.effect : ''}`} />
