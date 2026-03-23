@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc, setDoc, writeBatch, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc, setDoc, writeBatch, getDocs, deleteDoc, orderBy, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { useGame } from './GameContext';
 import { Room, PlayerState, Scenario, Invite, UserProfile } from './types';
 import { createDeck, INITIAL_SCORE } from './gameLogic';
-import { Beer, Users, Plus, Play, LogOut, TreePine, Waves, Home, Flame, UserPlus } from 'lucide-react';
+import { Beer, Users, Plus, Play, LogOut, TreePine, Waves, Home, Flame, UserPlus, Trophy, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { FriendsList } from './components/FriendsList';
 import { Store } from './components/Store';
@@ -23,7 +23,8 @@ export const Lobby: React.FC = () => {
   const [curingaMode, setCuringaMode] = useState<'original' | 'all'>('original');
   const [isStoreOpen, setIsStoreOpen] = useState(false);
   const [welcomeFriend, setWelcomeFriend] = useState<UserProfile | null>(null);
-
+  const [showRanking, setShowRanking] = useState(false);
+  const [rankings, setRankings] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     if (!showRanking) return;
