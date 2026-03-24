@@ -20,6 +20,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   const [showHelp, setShowHelp] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [roundWinnerName, setRoundWinnerName] = useState<string | null>(null);
+  const [roundCountdown, setRoundCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     // Tentar forçar orientação landscape em dispositivos móveis
@@ -177,45 +178,68 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
   useEffect(() => {
     if (!room || !isCreator || room.status !== 'waiting') return;
+    if (room.winnerId) return; // Rodada acabou de terminar, roundCountdown cuida disso
     if (allReady && room.playerIds.length > 1) {
       setCountdown(3);
     } else {
       setCountdown(null);
     }
-  }, [allReady, isCreator, room?.status, room?.playerIds.length]);
+  }, [allReady, isCreator, room?.status, room?.playerIds.length, room?.winnerId]);
 
 
-  // Detectar fim de rodada na Cacheta e mostrar overlay do vencedor
+  // Detectar fim de rodada na Cacheta e iniciar contagem regressiva
   useEffect(() => {
     if (!room || room.gameMode === 'pife') return;
     if (room.status === 'waiting' && room.winnerId) {
       const winnerIndex = room.playerIds.indexOf(room.winnerId);
       const winnerName = winnerIndex >= 0 ? room.playerNames[winnerIndex] : 'Jogador';
       setRoundWinnerName(winnerName);
-      const timer = setTimeout(async () => {
-        setRoundWinnerName(null);
-        // Apenas o criador reseta o estado dos jogadores para a próxima rodada
-        if (isCreator && room) {
-          try {
-            const batch = writeBatch(db);
-            for (const uid of room.playerIds) {
-              batch.update(doc(db, `rooms/${roomId}/playerStates`, uid), {
-                isReady: false,
-                isFolded: false,
-                decisionMade: false,
-                hand: []
-              });
-            }
-            await batch.commit();
-            await updateDoc(doc(db, 'rooms', roomId), { winnerId: null });
-          } catch (e) {
-            console.error('Erro ao resetar estado para próxima rodada:', e);
-          }
-        }
-      }, 3500);
-      return () => clearTimeout(timer);
+      setRoundCountdown(3);
     }
-  }, [room?.status, room?.winnerId, isCreator, roomId]);
+  }, [room?.status, room?.winnerId]);
+
+  // Função chamada pelo creator após contagem: reseta estados e inicia distribuição
+  const startNextRound = React.useCallback(async () => {
+    if (!room || !isCreator) return;
+    try {
+      const deckCount = room.playerIds.length >= 7 ? 3 : 2;
+      const deck = createDeck(deckCount);
+      const vira = deck.pop()!;
+      const batch = writeBatch(db);
+      for (const uid of room.playerIds) {
+        batch.update(doc(db, `rooms/${roomId}/playerStates`, uid), {
+          isReady: true,
+          isFolded: false,
+          decisionMade: false,
+          hand: []
+        });
+      }
+      batch.update(doc(db, 'rooms', roomId), {
+        status: 'dealing',
+        deck,
+        discardPile: [],
+        vira,
+        winnerId: null,
+        lastActionAt: serverTimestamp()
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error('Erro ao iniciar próxima rodada:', e);
+    }
+  }, [room, isCreator, roomId]);
+
+  // Tick da contagem regressiva entre rodadas
+  useEffect(() => {
+    if (roundCountdown === null) return;
+    if (roundCountdown <= 0) {
+      setRoundWinnerName(null);
+      setRoundCountdown(null);
+      if (isCreator) startNextRound();
+      return;
+    }
+    const t = setTimeout(() => setRoundCountdown(c => (c ?? 1) - 1), 1000);
+    return () => clearTimeout(t);
+  }, [roundCountdown, isCreator, startNextRound]);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -948,7 +972,23 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                 <Trophy className="w-20 h-20 text-amber-400 mx-auto mb-4 drop-shadow-[0_0_30px_rgba(245,158,11,0.8)]" />
                 <p className="text-white/60 uppercase tracking-widest text-sm font-bold mb-2">Vencedor da Rodada</p>
                 <p className="text-4xl font-black text-amber-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]">{roundWinnerName}</p>
-                <p className="text-white/40 text-sm mt-4 italic">Próxima rodada em breve...</p>
+                <AnimatePresence mode="wait">
+                  {roundCountdown !== null && roundCountdown > 0 && (
+                    <motion.p
+                      key={roundCountdown}
+                      initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 1.2 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-6xl font-black text-white mt-6 drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]"
+                    >
+                      {roundCountdown}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+                <p className="text-white/40 text-xs mt-2 uppercase tracking-widest">
+                  {roundCountdown !== null && roundCountdown > 0 ? 'próxima rodada...' : 'distribuindo cartas...'}
+                </p>
               </div>
             </motion.div>
           )}
