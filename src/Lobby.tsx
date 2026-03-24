@@ -276,6 +276,22 @@ export const Lobby: React.FC = () => {
                   </button>
                 </div>
 
+                <h2 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-3">Regra do Coringa</h2>
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  <button
+                    onClick={() => setCuringaMode('original')}
+                    className={`p-3 rounded-2xl font-bold uppercase text-xs sm:text-sm transition-all border ${curingaMode === 'original' ? 'bg-amber-500 border-amber-400 text-white shadow-lg' : 'bg-white/5 border-transparent text-white/40 hover:bg-white/10'}`}
+                  >
+                    Original (1 Naipe)
+                  </button>
+                  <button
+                    onClick={() => setCuringaMode('all')}
+                    className={`p-3 rounded-2xl font-bold uppercase text-xs sm:text-sm transition-all border ${curingaMode === 'all' ? 'bg-amber-500 border-amber-400 text-white shadow-lg' : 'bg-white/5 border-transparent text-white/40 hover:bg-white/10'}`}
+                  >
+                    Todos os Naipes
+                  </button>
+                </div>
+
                 <h2 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-4">Escolha o Cenário</h2>
                 <div className="grid grid-cols-5 gap-2">
                   {[
