@@ -9,6 +9,7 @@ import { collection, query, where, onSnapshot, deleteDoc, doc, getDoc, setDoc, s
 import { db } from './firebase';
 import { Invite } from './types';
 import { BannerAd } from './components/BannerAd';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   const { user, profile, loading, logout } = useGame();
@@ -67,7 +68,9 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                   >
-                    <Lobby />
+                    <ErrorBoundary>
+                      <Lobby />
+                    </ErrorBoundary>
                   </motion.div>
                 </RequireAuth>
               } 
@@ -83,7 +86,9 @@ export default function App() {
                     exit={{ opacity: 0, scale: 1.05 }}
                     className="w-full"
                   >
-                    <GameRoomWrapper />
+                    <ErrorBoundary>
+                      <GameRoomWrapper />
+                    </ErrorBoundary>
                   </motion.div>
                 </RequireAuth>
               } 

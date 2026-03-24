@@ -712,7 +712,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
   const getPlayerPosition = (index: number, total: number) => {
     if (!user || !room) return 0;
-    const myIndex = room.playerIds.indexOf(user.uid);
+    const myIndex = (room.playerIds || []).indexOf(user.uid);
     // Retorna a posição relativa (0 é a minha posição na parte inferior)
     return (index - myIndex + total) % total;
   };
@@ -728,7 +728,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
   const scenarioConfig = getScenarioConfig(room.scenario);
 
-  const isMyTurn = room.playerIds[room.currentTurnIndex] === user?.uid;
+  const isMyTurn = room.playerIds?.[room.currentTurnIndex] === user?.uid;
   const canDraw = isMyTurn && playerState && playerState.hand.length === 9 && room.status === 'playing';
   const canDiscard = isMyTurn && playerState && playerState.hand.length === 10 && room.status === 'playing';
 
@@ -758,7 +758,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           >
             <span className="font-serif italic font-black text-lg">?</span>
           </button>
-          {user && <VoiceChat roomId={roomId} userId={user.uid} playerIds={room.playerIds} />}
+          {user && <VoiceChat roomId={roomId} userId={user.uid} playerIds={room.playerIds || []} />}
           <button onClick={onLeaveGame} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-red-500/20 text-white rounded-full transition-colors">
             <LogOut className="w-4 h-4" /> Sair da Mesa
           </button>
@@ -806,7 +806,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
               <Trophy className="w-6 h-6" /> Placar da Mesa
             </h3>
             <div className="flex flex-col gap-3">
-              {room.playerIds.map((pid, idx) => {
+              {(room.playerIds || []).map((pid, idx) => {
                 const score = room.playerScores?.[pid] || 0;
                 const isMe = pid === user?.uid;
                 const pState = allPlayerStates[pid];
@@ -897,8 +897,8 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
         )}
 
         {/* Jogadores ao redor da mesa */}
-        {room.playerIds.map((pid, idx) => {
-          const total = room.playerIds.length;
+        {(room.playerIds || []).map((pid, idx) => {
+          const total = (room.playerIds || []).length;
           const pos = getPlayerPosition(idx, total);
           const flexClass = getFlexClass(Number(pos), Number(total));
           const isCurrentTurn = room.status === 'playing' && room.currentTurnIndex === idx;
@@ -967,7 +967,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
             >
               <Beer className="w-10 h-10 text-white/20" />
             </motion.button>
-            <span className="text-xs text-white/40 uppercase tracking-widest font-bold">Monte ({room.deck.length})</span>
+            <span className="text-xs text-white/40 uppercase tracking-widest font-bold">Monte ({room.deck?.length || 0})</span>
           </div>
 
           {/* Vira */}
@@ -993,12 +993,12 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
           {/* Lixo */}
           <div className="flex flex-col items-center gap-2">
             <motion.button
-              whileHover={canDraw && room.discardPile.length > 0 ? { scale: 1.05, y: -5 } : {}}
+              whileHover={canDraw && (room.discardPile?.length || 0) > 0 ? { scale: 1.05, y: -5 } : {}}
               onClick={() => drawCard(false)}
-              disabled={!canDraw || room.discardPile.length === 0}
-              className={`w-24 h-36 rounded-xl border-4 flex items-center justify-center shadow-xl transition-all relative ${canDraw && room.discardPile.length > 0 ? 'bg-white border-amber-400 cursor-pointer' : 'bg-stone-800 border-stone-700 opacity-50'}`}
+              disabled={!canDraw || (room.discardPile?.length || 0) === 0}
+              className={`w-24 h-36 rounded-xl border-4 flex items-center justify-center shadow-xl transition-all relative ${canDraw && (room.discardPile?.length || 0) > 0 ? 'bg-white border-amber-400 cursor-pointer' : 'bg-stone-800 border-stone-700 opacity-50'}`}
             >
-              {room.discardPile.length > 0 ? (
+              {(room.discardPile?.length || 0) > 0 ? (
                 <div className="text-center">
                   <span className={`text-2xl font-bold ${['hearts', 'diamonds'].includes(room.discardPile[room.discardPile.length-1].suit) ? 'text-red-600' : 'text-black'}`}>
                     {room.discardPile[room.discardPile.length-1].label}
@@ -1209,7 +1209,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
               {(() => {
                 const isWinner = room.winnerId === user?.uid;
                 const WinAnim = getWinAnimation(room.winnerId!);
-                const winnerName = isWinner ? 'VOCÊ' : room.playerNames?.[room.playerIds.indexOf(room.winnerId!)] || 'Jogador';
+                const winnerName = isWinner ? 'VOCÊ' : room.playerNames?.[(room.playerIds || []).indexOf(room.winnerId!)] || 'Jogador';
                 return (
                   <>
                     <WinAnim.icon className={`w-32 h-32 mb-6 ${isWinner ? WinAnim.color : 'text-amber-500'} ${isWinner ? WinAnim.effect : ''}`} />
