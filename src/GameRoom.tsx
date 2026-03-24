@@ -3,7 +3,8 @@ import { doc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, 
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { useGame } from './GameContext';
 import { Room, PlayerState, Card, Scenario } from './types';
-import { createDeck, shuffle, validateWin, botPlay, PENALTY, INITIAL_SCORE, FOLD_PENALTY } from './gameLogic';
+import { createDeck, shuffle, validateWin, botPlay, INITIAL_SCORE } from './gameLogic';
+import { getRules } from './rules';
 import { Beer, Users, Play, LogOut, RefreshCcw, Trophy, ChevronRight, Hand, Flame, Waves, TreePine, Home, Zap, Skull, Frown, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VoiceChat } from './components/VoiceChat';
@@ -184,17 +185,37 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   }, [allReady, isCreator, room?.status, room?.playerIds.length]);
 
 
-  // Ajuste 3: Detectar fim de rodada na Cacheta e mostrar overlay do vencedor
+  // Detectar fim de rodada na Cacheta e mostrar overlay do vencedor
   useEffect(() => {
     if (!room || room.gameMode === 'pife') return;
     if (room.status === 'waiting' && room.winnerId) {
       const winnerIndex = room.playerIds.indexOf(room.winnerId);
       const winnerName = winnerIndex >= 0 ? room.playerNames[winnerIndex] : 'Jogador';
       setRoundWinnerName(winnerName);
-      const timer = setTimeout(() => setRoundWinnerName(null), 3500);
+      const timer = setTimeout(async () => {
+        setRoundWinnerName(null);
+        // Apenas o criador reseta o estado dos jogadores para a próxima rodada
+        if (isCreator && room) {
+          try {
+            const batch = writeBatch(db);
+            for (const uid of room.playerIds) {
+              batch.update(doc(db, `rooms/${roomId}/playerStates`, uid), {
+                isReady: false,
+                isFolded: false,
+                decisionMade: false,
+                hand: []
+              });
+            }
+            await batch.commit();
+            await updateDoc(doc(db, 'rooms', roomId), { winnerId: null });
+          } catch (e) {
+            console.error('Erro ao resetar estado para próxima rodada:', e);
+          }
+        }
+      }, 3500);
       return () => clearTimeout(timer);
     }
-  }, [room?.status, room?.winnerId]);
+  }, [room?.status, room?.winnerId, isCreator, roomId]);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -354,18 +375,18 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
       const newScores = { ...(room.playerScores || {}) };
       const winnerId = user.uid;
       
-      // Penalize others (only if they haven't folded)
+      // Penaliza os demais (apenas se não correram) usando as regras do modo
+      const rules = getRules(room.gameMode);
       if (room.gameMode !== 'pife') {
         room.playerIds.forEach(pid => {
           if (pid !== winnerId && !allPlayerStates[pid]?.isFolded) {
-            newScores[pid] = Math.max(0, (newScores[pid] || 0) - PENALTY);
+            newScores[pid] = Math.max(0, (newScores[pid] || 0) - rules.ROUND_PENALTY);
           }
         });
       }
 
-      // Check if game is over (only one player with points > 0)
-      const playersWithPoints = Object.entries(newScores).filter(([_, score]) => score > 0);
-      const isGameOver = room.gameMode === 'pife' || playersWithPoints.length <= 1;
+      // Verifica fim de jogo
+      const isGameOver = rules.isGameOver(newScores);
 
       try {
         await updateDoc(doc(db, 'rooms', roomId), {
@@ -389,7 +410,8 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
     try {
       const newScores = { ...(room.playerScores || {}) };
-      newScores[user.uid] = Math.max(0, (newScores[user.uid] || 0) - FOLD_PENALTY);
+      const rules = getRules(room.gameMode);
+      newScores[user.uid] = Math.max(0, (newScores[user.uid] || 0) - rules.FOLD_PENALTY);
 
       await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
         isFolded: true
@@ -549,16 +571,17 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
       // 2. Check if bot can win
       if (validateWin(handAfterDraw, room.vira, room.curingaMode)) {
         const newScores = { ...room.playerScores };
+        const rulesBot = getRules(room.gameMode);
         if (room.gameMode !== 'pife') {
           room.playerIds.forEach(pid => {
             if (pid !== 'bot_1') {
-              newScores[pid] = Math.max(0, (newScores[pid] || 0) - PENALTY);
+              newScores[pid] = Math.max(0, (newScores[pid] || 0) - rulesBot.ROUND_PENALTY);
             }
           });
         }
-        const playersWithPoints = Object.entries(newScores).filter(([_, score]) => score > 0);
+        const isGameOverBot = rulesBot.isGameOver(newScores);
         await updateDoc(doc(db, 'rooms', roomId), {
-          status: room.gameMode === 'pife' || playersWithPoints.length <= 1 ? 'finished' : 'waiting',
+          status: isGameOverBot ? 'finished' : 'waiting',
           winnerId: 'bot_1',
           playerScores: newScores,
           lastActionAt: serverTimestamp(),
@@ -948,16 +971,16 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                 <button
                   onClick={async () => {
                     if (!user || !room) return;
+                    const rulesDecision = getRules(room.gameMode);
                     const newScores = { ...(room.playerScores || {}) };
-                    newScores[user.uid] = Math.max(0, (newScores[user.uid] || 0) - FOLD_PENALTY);
+                    newScores[user.uid] = Math.max(0, (newScores[user.uid] || 0) - rulesDecision.FOLD_PENALTY);
                     await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), { isFolded: true, decisionMade: true });
                     const activePlayers = room.playerIds.filter(pid =>
                       pid === user.uid ? false : (!allPlayerStates[pid]?.isFolded && (newScores[pid] === undefined || newScores[pid] > 0))
                     );
                     if (activePlayers.length <= 1) {
                       const winnerId = activePlayers[0] || room.playerIds.filter(p => p !== user.uid)[0];
-                      const playersWithPoints = Object.entries(newScores).filter(([_, s]) => (s as number) > 0);
-                      const isGameOver = room.gameMode === 'pife' || playersWithPoints.length <= 1;
+                      const isGameOver = rulesDecision.isGameOver(newScores);
                       await updateDoc(doc(db, 'rooms', roomId), {
                         playerScores: newScores,
                         status: isGameOver ? 'finished' : 'waiting',
