@@ -36,6 +36,29 @@
 - **Como um jogador bate**: O jogador deve ter todas as 10 cartas organizadas em jogos (ex: duas trincas de 3 e uma sequência de 4, ou três jogos de 3 e descartar a 10ª carta validando o fechamento).
 - **Regras de fechamento da rodada**: Ao bater, a rodada se encerra. Os outros jogadores perdem pontos.
 
+## 🎲 Modos de Jogo
+
+| Modo | Descrição | Pontuação | Fim de Partida |
+|---|---|---|---|
+| **Cacheta** | Modo clássico com múltiplas rodadas | Inicia com 10 pontos | Quando 1 jogador tem pontos e os demais chegaram a 0 |
+| **Pife** | Partida rápida de 1 única rodada | Sem pontuação acumulada | Ao final da primeira rodada (quem bater ou sobrar como único vence) |
+
+### Regras da Cacheta (múltiplas rodadas)
+- Cada jogador começa com **10 pontos**.
+- Ao final de cada rodada:
+  - Perdedores (jogadores que não bateram): **-2 pontos**.
+  - Jogador que "correu" (desistiu): **-1 ponto**.
+- O jogador que bater vence a rodada (sem perda de pontos).
+- A partida continua até restar apenas 1 jogador com pontos acima de 0.
+- Ao terminar a rodada, um **overlay de vencedor** é exibido antes de reiniciar.
+
+### Regras do Pife (rodada única)
+- Uma única rodada determina o vencedor da partida.
+- Quem bater primeiro, ou for o último sobrevivente (se todos correram), vence imediatamente.
+- Não há acúmulo de pontos entre rodadas.
+
+---
+
 ### 🚫 Regras Especiais
 - **Correr (Fold)**: O jogador pode desistir da rodada antes de perder mais pontos, sofrendo uma penalidade menor.
 - **Reembaralhar Lixo**: Se o deck acabar, a pilha de descarte (exceto a carta do topo) é reembaralhada para formar um novo monte.

@@ -64,11 +64,19 @@ export const Lobby: React.FC = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const roomsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Room));
       setRooms(roomsData);
+
+      // Ajuste 2: Redirecionar automaticamente se o usuário foi aprovado em alguma sala
+      if (user) {
+        const myRoom = roomsData.find(r => r.playerIds.includes(user.uid));
+        if (myRoom) {
+          navigate(`/room/${myRoom.id}`);
+        }
+      }
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'rooms');
     });
     return () => unsubscribe();
-  }, []);
+  }, [user?.uid]);
 
   const createRoom = async () => {
     if (!user || !profile || creating) return;
@@ -320,7 +328,16 @@ export const Lobby: React.FC = () => {
                     className="p-5 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 flex justify-between items-center group transition-all"
                   >
                     <div>
-                      <h3 className="text-white font-bold text-lg">{room.name}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-white font-bold text-lg">{room.name}</h3>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                          room.gameMode === 'pife'
+                            ? 'text-blue-400 border-blue-500/40 bg-blue-500/10'
+                            : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                        }`}>
+                          {room.gameMode === 'pife' ? '⚡ Pife' : '🏆 Cacheta'}
+                        </span>
+                      </div>
                       <p className="text-white/40 text-sm flex items-center gap-2">
                         <Users className="w-4 h-4" /> {room.playerIds.length}/{room.maxPlayers} Jogadores
                       </p>

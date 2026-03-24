@@ -18,14 +18,28 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   const [gameError, setGameError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [roundWinnerName, setRoundWinnerName] = useState<string | null>(null);
 
   useEffect(() => {
     // Tentar forçar orientação landscape em dispositivos móveis
-    try {
-      if (screen.orientation && (screen.orientation as any).lock) {
-        (screen.orientation as any).lock('landscape').catch(() => {});
+    const tryLock = async () => {
+      try {
+        if (screen.orientation && typeof (screen.orientation as any).lock === 'function') {
+          await (screen.orientation as any).lock('landscape');
+        }
+      } catch(e) {
+        // Fallback: orientação não suportada (ex: iOS Safari)
+        // Nesse caso o CSS cuida da rotação via media query
       }
-    } catch(e) {}
+    };
+    tryLock();
+    return () => {
+      try {
+        if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+          screen.orientation.unlock();
+        }
+      } catch(e) {}
+    };
   }, []);
 
   useEffect(() => {
@@ -168,6 +182,18 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
       setCountdown(null);
     }
   }, [allReady, isCreator, room?.status, room?.playerIds.length]);
+
+  // Ajuste 3: Detectar fim de rodada na Cacheta e mostrar overlay do vencedor
+  useEffect(() => {
+    if (!room || room.gameMode === 'pife') return;
+    if (room.status === 'waiting' && room.winnerId) {
+      const winnerIndex = room.playerIds.indexOf(room.winnerId);
+      const winnerName = winnerIndex >= 0 ? room.playerNames[winnerIndex] : 'Jogador';
+      setRoundWinnerName(winnerName);
+      const timer = setTimeout(() => setRoundWinnerName(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [room?.status, room?.winnerId]);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -874,6 +900,25 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
             <TextChat roomId={roomId} user={user} />
           </div>
         )}
+
+        {/* Overlay: Vencedor da Rodada (apenas Cacheta) */}
+        <AnimatePresence>
+          {roundWinnerName && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="absolute inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-md pointer-events-none"
+            >
+              <div className="text-center">
+                <Trophy className="w-20 h-20 text-amber-400 mx-auto mb-4 drop-shadow-[0_0_30px_rgba(245,158,11,0.8)]" />
+                <p className="text-white/60 uppercase tracking-widest text-sm font-bold mb-2">Vencedor da Rodada</p>
+                <p className="text-4xl font-black text-amber-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]">{roundWinnerName}</p>
+                <p className="text-white/40 text-sm mt-4 italic">Próxima rodada em breve...</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {room.status === 'decision' && !playerState?.decisionMade && (
           <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
