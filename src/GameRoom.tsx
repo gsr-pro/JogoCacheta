@@ -183,6 +183,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     }
   }, [allReady, isCreator, room?.status, room?.playerIds.length]);
 
+
   // Ajuste 3: Detectar fim de rodada na Cacheta e mostrar overlay do vencedor
   useEffect(() => {
     if (!room || room.gameMode === 'pife') return;
@@ -894,6 +895,16 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
         {/* Placar removido de dentro da mesa */}
 
+        {/* Ajuste 3: Label do Tipo de Coringa */}
+        {room.curingaMode && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/50 backdrop-blur-sm border border-white/10 px-3 py-1 rounded-full pointer-events-none">
+            <Zap className="w-3 h-3 text-amber-400" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+              Coringa: {room.curingaMode === 'all' ? 'Todos os Naipes' : 'Original'}
+            </span>
+          </div>
+        )}
+
         {/* Chat de Texto */}
         {user && (
           <div className="absolute bottom-8 right-8 z-50">
@@ -923,21 +934,44 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
         {room.status === 'decision' && !playerState?.decisionMade && (
           <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
             <div className="bg-stone-900 border-2 border-amber-500 rounded-[2rem] p-8 text-center shadow-[0_0_50px_rgba(245,158,11,0.5)]">
-              <h3 className="text-3xl font-black text-white italic font-serif mb-6">Jogar ou Correr?</h3>
+              <h3 className="text-3xl font-black text-white italic font-serif mb-2">Jogar ou Correr?</h3>
+              <p className="text-white/40 text-sm mb-6">Decida antes de o jogo começar</p>
               <div className="flex gap-4">
                 <button
                   onClick={async () => {
                     await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), { decisionMade: true });
                   }}
-                  className="px-8 py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-400 transition-all text-xl"
+                  className="px-8 py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-400 transition-all text-xl shadow-[0_0_20px_rgba(34,197,94,0.4)]"
                 >
-                  Jogar
+                  Vou Jogar!
                 </button>
                 <button
                   onClick={async () => {
+                    if (!user || !room) return;
+                    const newScores = { ...(room.playerScores || {}) };
+                    newScores[user.uid] = Math.max(0, (newScores[user.uid] || 0) - FOLD_PENALTY);
                     await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), { isFolded: true, decisionMade: true });
+                    const activePlayers = room.playerIds.filter(pid =>
+                      pid === user.uid ? false : (!allPlayerStates[pid]?.isFolded && (newScores[pid] === undefined || newScores[pid] > 0))
+                    );
+                    if (activePlayers.length <= 1) {
+                      const winnerId = activePlayers[0] || room.playerIds.filter(p => p !== user.uid)[0];
+                      const playersWithPoints = Object.entries(newScores).filter(([_, s]) => (s as number) > 0);
+                      const isGameOver = room.gameMode === 'pife' || playersWithPoints.length <= 1;
+                      await updateDoc(doc(db, 'rooms', roomId), {
+                        playerScores: newScores,
+                        status: isGameOver ? 'finished' : 'waiting',
+                        winnerId: winnerId || null,
+                        lastActionAt: serverTimestamp(),
+                      });
+                    } else {
+                      await updateDoc(doc(db, 'rooms', roomId), {
+                        playerScores: newScores,
+                        lastActionAt: serverTimestamp(),
+                      });
+                    }
                   }}
-                  className="px-8 py-4 bg-red-500/20 text-red-500 font-bold rounded-2xl hover:bg-red-500 hover:text-white transition-all text-xl border border-red-500/50"
+                  className="px-8 py-4 bg-red-500/20 text-red-400 font-bold rounded-2xl hover:bg-red-500 hover:text-white transition-all text-xl border border-red-500/50"
                 >
                   Correr
                 </button>
