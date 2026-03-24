@@ -94,6 +94,7 @@ export interface Room {
   isBotGame: boolean;
   creatorId: string;
   pendingRequests?: JoinRequest[];
+  turnEndsAt?: number;
 }
 
 export interface PlayerState {

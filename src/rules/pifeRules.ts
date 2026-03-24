@@ -13,6 +13,7 @@ export const pifeRules: GameRules = {
   INITIAL_SCORE: 10,
   ROUND_PENALTY: 0,   // Pife não penaliza pois a partida já encerra
   FOLD_PENALTY: 0,    // Correr no Pife não deduz; a rodada única simplesmente encerra
+  TURN_TIME_SECONDS: 20, // 20s para descartar após puxar carta
   isGameOver: (_scores) => {
     // No Pife, o jogo SEMPRE termina após a primeira rodada
     return true;

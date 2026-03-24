@@ -17,11 +17,14 @@
 - **Quantidade de cartas por jogador**: 9 cartas inicialmente. Ao iniciar o turno, o jogador compra uma carta, totalizando 10, e deve descartar uma para voltar a 9.
 - **Formação do monte**: As cartas restantes após a distribuição formam o "Monte" (Deck). Há também uma "Pilha de Descarte" (Lixo).
 
-### 🔄 Turnos
+### 🔄 Turnos e Tempo
 - **Ordem de jogadas**: Sentido horário.
+- **Limite de Tempo**: 
+  - **Cacheta**: 15 segundos por turno.
+  - **Pife**: 20 segundos por turno.
 - **Ações possíveis por turno**:
-  1. **Comprar**: O jogador da vez pode comprar uma carta do Monte ou a última carta descartada na Pilha de Descarte.
-  2. **Descartar**: Após comprar, o jogador deve escolher uma carta de sua mão para descartar na Pilha.
+  1. **Comprar**: O jogador da vez pode comprar uma carta do Monte ou a última carta descartada na Pilha de Descarte. O timer de descarte inicia assim que a carta é comprada.
+  2. **Descartar**: Após comprar, o jogador deve escolher uma carta de sua mão para descartar na Pilha. **É obrigatório terminar o turno com exatamente 9 cartas na mão.** Se o tempo expirar, o sistema descartará uma carta aleatória automaticamente.
   3. **Bater**: Se ao comprar a 10ª carta o jogador completar seus jogos, ele pode "Bater" e encerrar a rodada.
 
 ### 🧩 Combinações Válidas

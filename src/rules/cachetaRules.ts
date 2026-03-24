@@ -15,6 +15,7 @@ export const cachetaRules: GameRules = {
   INITIAL_SCORE: 10,
   ROUND_PENALTY: 2,  // Perdedores da rodada perdem 2 pontos
   FOLD_PENALTY: 1,   // Quem corre perde 1 ponto
+  TURN_TIME_SECONDS: 15, // 15s para descartar após puxar carta
   isGameOver: (scores) => {
     const playersWithPoints = Object.values(scores).filter(s => s > 0);
     return playersWithPoints.length <= 1;

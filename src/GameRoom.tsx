@@ -96,6 +96,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   }, [roomId, room?.id]);
 
   const [starting, setStarting] = useState(false);
+  const [turnTimeLeft, setTurnTimeLeft] = useState<number | null>(null);
   const isCreator = room?.creatorId === user?.uid || (!room?.creatorId && room?.playerIds?.[0] === user?.uid);
   const allReady = room?.playerIds ? room.playerIds.every(pid => allPlayerStates[pid]?.isReady) : false;
 
@@ -241,6 +242,16 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     return () => clearTimeout(t);
   }, [roundCountdown, isCreator, startNextRound]);
 
+  // Limpar overlay para TODOS os jogadores quando o Firestore sinaliza nova rodada
+  // Garante que o loser não fique preso na tela do vencedor
+  useEffect(() => {
+    if (!room) return;
+    if (room.status === 'dealing' || room.status === 'decision' || room.status === 'playing') {
+      setRoundWinnerName(null);
+      setRoundCountdown(null);
+    }
+  }, [room?.status]);
+
   useEffect(() => {
     if (countdown === null) return;
     if (countdown <= 0) {
@@ -254,6 +265,35 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     }, 1000);
     return () => clearTimeout(timer);
   }, [countdown, isCreator, starting, room?.status]);
+
+  // Turn Timer Logic
+  useEffect(() => {
+    if (!room || room.status !== 'playing') {
+      setTurnTimeLeft(null);
+      return;
+    }
+
+    const turnEndsAt = room.turnEndsAt;
+    if (!turnEndsAt) {
+      setTurnTimeLeft(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diff = Math.max(0, Math.round((turnEndsAt - now) / 1000));
+      setTurnTimeLeft(diff);
+
+      // Auto-discard if timer expires and it's my turn
+      if (diff <= 0 && room.playerIds[room.currentTurnIndex] === user?.uid && playerState && playerState.hand.length === 10) {
+        clearInterval(interval);
+        const lastCard = playerState.hand[playerState.hand.length - 1];
+        discardCard(lastCard.id);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [room?.turnEndsAt, room?.status, room?.currentTurnIndex, user?.uid, playerState?.hand]);
 
   const handleRequest = async (requestId: string, approve: boolean) => {
     if (!user || !room || !isCreator) return;
@@ -344,14 +384,23 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     if (!card) return;
 
     try {
-      await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
+      const rules = getRules(room.gameMode);
+      const batch = writeBatch(db);
+      
+      // Update Player State
+      batch.update(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
         hand: [...playerState.hand, card]
       });
-      await updateDoc(doc(db, 'rooms', roomId), {
+
+      // Update Room State with Turn Timer
+      batch.update(doc(db, 'rooms', roomId), {
         deck: newDeck,
         discardPile: newDiscard,
+        turnEndsAt: Date.now() + (rules.TURN_TIME_SECONDS * 1000),
         lastActionAt: serverTimestamp(),
       });
+
+      await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}`);
     }
@@ -378,14 +427,22 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
     }
 
     try {
-      await updateDoc(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
+      const batch = writeBatch(db);
+      
+      // 1. Update Player State (remove the card)
+      batch.update(doc(db, `rooms/${roomId}/playerStates`, user.uid), {
         hand: newHand
       });
-      await updateDoc(doc(db, 'rooms', roomId), {
+
+      // 2. Update Room State (advance turn, remove timer)
+      batch.update(doc(db, 'rooms', roomId), {
         discardPile: newDiscard,
         currentTurnIndex: nextTurn,
+        turnEndsAt: null, // Clear the timer
         lastActionAt: serverTimestamp(),
       });
+
+      await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}`);
     }
@@ -1070,6 +1127,11 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                 <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs font-black w-8 h-8 rounded-full flex items-center justify-center border-4 border-stone-900 shadow-lg">
                   {room.playerScores?.[pid] || 0}
                 </div>
+                {isCurrentTurn && room.turnEndsAt && (
+                   <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full border-2 border-stone-900 animate-pulse">
+                     {Math.max(0, Math.round((room.turnEndsAt - Date.now()) / 1000))}s
+                   </div>
+                )}
                 {isCurrentTurn && (
                   <motion.div 
                     animate={{ scale: [1, 1.2, 1] }}
@@ -1083,7 +1145,7 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
                   </div>
                 )}
               </div>
-              <div className="text-center">
+              <div className="flex flex-col">
                 <span className="text-sm text-white font-bold block">{room.playerNames?.[idx] || 'Jogador'}</span>
                 {room.status === 'playing' && pState && !pState.isFolded && (
                   <span className="text-xs text-white/60 block">{pState.hand.length} cartas</span>
@@ -1287,26 +1349,28 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
               <p className="text-white/40 italic text-xs">Aguardando o dono da mesa iniciar o jogo...</p>
             </div>
           ) : null}
-          <div className="flex items-center gap-4">
-            {canDiscard && !playerState?.isFolded && (
-              <button onClick={bate} className="flex items-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-full shadow-xl uppercase tracking-widest transition-all">
-                <Trophy className="w-5 h-5" /> Bater!
-              </button>
-            )}
-            {room.status === 'playing' && !playerState?.isFolded && (
-              <button 
-                onClick={correrRound} 
-                className="flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full shadow-xl uppercase tracking-widest transition-all"
-                title="Desistir da rodada e perder apenas 1 ponto"
-              >
-                <LogOut className="w-4 h-4" /> Correr
-              </button>
-            )}
-          </div>
-          </div>
-        </div>
+          {room.status === 'playing' && (
+            <div className="flex flex-col items-center gap-4">
+              <div className={`text-4xl font-black italic mb-2 ${isMyTurn ? 'text-amber-500' : 'text-white/20'}`}>
+                {isMyTurn ? 'SUA VEZ!' : 'AGUARDE...'}
+              </div>
+              {isMyTurn && turnTimeLeft !== null && (
+                <div className={`text-2xl font-black mb-4 ${turnTimeLeft < 5 ? 'text-red-500 animate-bounce' : 'text-amber-500'}`}>
+                  {turnTimeLeft}s restantes
+                </div>
+              )}
+              <div className="flex items-center gap-4">
+                {canDiscard && !playerState?.isFolded && (
+                  <button onClick={bate} className="flex items-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-full shadow-xl uppercase tracking-widest transition-all">
+                    <Trophy className="w-5 h-5" /> Bater!
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+    </div>
 
       {/* Overlay de Ajuda */}
         <AnimatePresence>

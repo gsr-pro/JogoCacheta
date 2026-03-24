@@ -13,6 +13,8 @@ export interface GameRules {
   displayName: string;
   /** Descrição do modo */
   description: string;
+  /** Segundos que o jogador tem para descartar após puxar uma carta */
+  TURN_TIME_SECONDS: number;
   /**
    * Verifica se a partida está encerrada com base nas pontuações atuais.
    * @param scores mapa de uid -> pontuação
