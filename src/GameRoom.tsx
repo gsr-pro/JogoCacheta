@@ -377,12 +377,16 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
       );
 
       if (activePlayers.length <= 1) {
-        // Only one player left! They win!
+        // Only one player left! They win the round!
         const winnerId = activePlayers[0] || room.playerIds[0];
+        
+        // Verifica se a partida inteira deve ser encerrada
+        const playersWithPoints = Object.entries(newScores).filter(([_, score]) => score > 0);
+        const isGameOver = room.gameMode === 'pife' || playersWithPoints.length <= 1;
         
         // As a rule, the winner doesn't lose points. Other folded players already lost 1.
         await updateDoc(doc(db, 'rooms', roomId), {
-          status: 'finished',
+          status: isGameOver ? 'finished' : 'waiting',
           winnerId: winnerId,
           playerScores: newScores,
           lastActionAt: serverTimestamp(),

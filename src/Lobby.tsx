@@ -79,10 +79,12 @@ export const Lobby: React.FC = () => {
       const playerPhotos = [profile.photoURL || ''];
       const playerScores: { [uid: string]: number } = { [user.uid]: INITIAL_SCORE };
 
-      const roomData = {
+      const roomData: Partial<Room> = {
         name: `Mesa do ${profile.displayName}`,
         status: 'waiting',
         scenario: selectedScenario,
+        gameMode: gameMode,
+        curingaMode: curingaMode,
         betAmount: 100,
         maxPlayers: 4,
         playerIds,
@@ -250,6 +252,22 @@ export const Lobby: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10">
+                <h2 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-4">Modo de Jogo</h2>
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  <button
+                    onClick={() => setGameMode('cacheta')}
+                    className={`p-3 rounded-2xl font-bold uppercase text-xs sm:text-sm transition-all border ${gameMode === 'cacheta' ? 'bg-amber-500 border-amber-400 text-white shadow-lg' : 'bg-white/5 border-transparent text-white/40 hover:bg-white/10'}`}
+                  >
+                    Cacheta (Pontos)
+                  </button>
+                  <button
+                    onClick={() => setGameMode('pife')}
+                    className={`p-3 rounded-2xl font-bold uppercase text-xs sm:text-sm transition-all border ${gameMode === 'pife' ? 'bg-amber-500 border-amber-400 text-white shadow-lg' : 'bg-white/5 border-transparent text-white/40 hover:bg-white/10'}`}
+                  >
+                    Pife (1 Rodada)
+                  </button>
+                </div>
+
                 <h2 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-4">Escolha o Cenário</h2>
                 <div className="grid grid-cols-5 gap-2">
                   {[
