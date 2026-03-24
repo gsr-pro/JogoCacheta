@@ -20,6 +20,15 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
   const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
+    // Tentar forçar orientação landscape em dispositivos móveis
+    try {
+      if (screen.orientation && (screen.orientation as any).lock) {
+        (screen.orientation as any).lock('landscape').catch(() => {});
+      }
+    } catch(e) {}
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     const unsubscribeRoom = onSnapshot(doc(db, 'rooms', roomId), (docSnap: any) => {
       if (docSnap.exists()) {
@@ -734,14 +743,6 @@ export const GameRoom: React.FC<{ roomId: string; onLeave: () => void }> = ({ ro
 
   const curingaValue = room.vira ? (room.vira.value === 13 ? 1 : room.vira.value + 1) : -1;
 
-  useEffect(() => {
-    // Tentar forçar orientação landscape em dispositivos móveis
-    try {
-      if (screen.orientation && (screen.orientation as any).lock) {
-        (screen.orientation as any).lock('landscape').catch(() => {});
-      }
-    } catch(e) {}
-  }, []);
 
   return (
     <div className="h-screen w-full flex flex-col p-2 lg:p-4 overflow-hidden relative selection:bg-transparent">
